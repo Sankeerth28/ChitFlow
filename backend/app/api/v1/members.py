@@ -51,6 +51,28 @@ class CsvImportPayload(BaseModel):
     csv_content: str
 
 
+def _prize_month(db: Session, scheme: ChitScheme, member_id: str, has_prized: bool) -> Optional[int]:
+    """Month in which the member won the auction, if any."""
+    if not has_prized:
+        return None
+    auction = (
+        db.query(Auction)
+        .filter(
+            Auction.scheme_id == scheme.id,
+            Auction.winning_member_id == member_id,
+            Auction.status == "confirmed",
+        )
+        .order_by(Auction.auction_number)
+        .first()
+    )
+    return auction.auction_number if auction else None
+
+
+def _completed_months(scheme: ChitScheme) -> int:
+    """Number of auctions already confirmed for the scheme."""
+    return sum(1 for a in (scheme.auctions or []) if a.status == "confirmed")
+
+
 def _map_member_to_response(m: Member) -> MemberResponse:
     active_schemes = 0
     if hasattr(m, "enrolled_schemes") and m.enrolled_schemes:
@@ -348,8 +370,6 @@ def get_member_full_profile(
         total_dividends += sch_div
         total_dues += sch_dues
 
-        auctions_count = len(scheme.auctions) if scheme.auctions else 0
-
         enrolled_details.append(
             EnrolledSchemeDetail(
                 scheme_member_id=sm.id,
@@ -362,8 +382,9 @@ def get_member_full_profile(
                 chit_ticket_number=sm.chit_ticket_number,
                 enrollment_date=sm.enrollment_date,
                 has_prized=sm.has_prized,
+                prize_month=_prize_month(db, scheme, member.id, sm.has_prized),
                 scheme_status=scheme.status,
-                current_month=min(scheme.duration_months, auctions_count + 1),
+                current_month=min(scheme.duration_months, _completed_months(scheme) + 1),
                 total_paid=sch_paid,
                 total_dividend=sch_div,
                 outstanding_balance=sch_dues,
@@ -382,8 +403,10 @@ def get_member_full_profile(
     for p in payments:
         inst = p.instalment
         scheme_code = "UNKNOWN"
+        scheme_name = "Chit Scheme"
         if inst and inst.scheme_member and inst.scheme_member.scheme:
             scheme_code = inst.scheme_member.scheme.scheme_code
+            scheme_name = inst.scheme_member.scheme.scheme_name
 
         receipts.append(
             MemberPaymentReceipt(
@@ -395,6 +418,7 @@ def get_member_full_profile(
                 payment_reference_no=p.payment_reference_no,
                 status=p.status,
                 scheme_code=scheme_code,
+                scheme_name=scheme_name,
                 instalment_number=inst.instalment_number if inst else 1,
                 gross_subscription=inst.gross_subscription if inst else Decimal('0.00'),
                 dividend_credit=inst.dividend_credit if inst else Decimal('0.00'),
@@ -416,9 +440,11 @@ def get_member_full_profile(
         )
         for ui in unpaid_insts:
             sch = ui.scheme_member.scheme if ui.scheme_member else None
+            balance_due = ui.net_amount_due - ui.amount_paid
             dues.append(
                 MemberDueDetail(
                     instalment_id=ui.id,
+                    scheme_id=sch.id if sch else "",
                     scheme_code=sch.scheme_code if sch else "CHIT",
                     scheme_name=sch.scheme_name if sch else "Chit Scheme",
                     instalment_number=ui.instalment_number,
@@ -426,8 +452,10 @@ def get_member_full_profile(
                     gross_subscription=ui.gross_subscription,
                     dividend_credit=ui.dividend_credit,
                     net_amount_due=ui.net_amount_due,
+                    dividend_amount=ui.dividend_credit,
+                    net_due=balance_due,
                     amount_paid=ui.amount_paid,
-                    balance_due=ui.net_amount_due - ui.amount_paid,
+                    balance_due=balance_due,
                     status=ui.status,
                 )
             )
@@ -468,7 +496,6 @@ def get_member_enrolled_chits(
         sch_paid = sum(i.amount_paid for i in insts)
         sch_div = sum(i.dividend_credit for i in insts)
         sch_dues = sum(i.net_amount_due - i.amount_paid for i in insts if i.status != "paid")
-        auctions_count = len(scheme.auctions) if scheme.auctions else 0
 
         results.append(
             EnrolledSchemeDetail(
@@ -482,8 +509,9 @@ def get_member_enrolled_chits(
                 chit_ticket_number=sm.chit_ticket_number,
                 enrollment_date=sm.enrollment_date,
                 has_prized=sm.has_prized,
+                prize_month=_prize_month(db, scheme, member.id, sm.has_prized),
                 scheme_status=scheme.status,
-                current_month=min(scheme.duration_months, auctions_count + 1),
+                current_month=min(scheme.duration_months, _completed_months(scheme) + 1),
                 total_paid=sch_paid,
                 total_dividend=sch_div,
                 outstanding_balance=sch_dues,
@@ -516,8 +544,10 @@ def get_member_receipts(
     for p in payments:
         inst = p.instalment
         scheme_code = "UNKNOWN"
+        scheme_name = "Chit Scheme"
         if inst and inst.scheme_member and inst.scheme_member.scheme:
             scheme_code = inst.scheme_member.scheme.scheme_code
+            scheme_name = inst.scheme_member.scheme.scheme_name
 
         results.append(
             MemberPaymentReceipt(
@@ -529,6 +559,7 @@ def get_member_receipts(
                 payment_reference_no=p.payment_reference_no,
                 status=p.status,
                 scheme_code=scheme_code,
+                scheme_name=scheme_name,
                 instalment_number=inst.instalment_number if inst else 1,
                 gross_subscription=inst.gross_subscription if inst else Decimal('0.00'),
                 dividend_credit=inst.dividend_credit if inst else Decimal('0.00'),
@@ -566,9 +597,11 @@ def get_member_dues(
         )
         for ui in unpaid_insts:
             sch = ui.scheme_member.scheme if ui.scheme_member else None
+            balance_due = ui.net_amount_due - ui.amount_paid
             results.append(
                 MemberDueDetail(
                     instalment_id=ui.id,
+                    scheme_id=sch.id if sch else "",
                     scheme_code=sch.scheme_code if sch else "CHIT",
                     scheme_name=sch.scheme_name if sch else "Chit Scheme",
                     instalment_number=ui.instalment_number,
@@ -576,8 +609,10 @@ def get_member_dues(
                     gross_subscription=ui.gross_subscription,
                     dividend_credit=ui.dividend_credit,
                     net_amount_due=ui.net_amount_due,
+                    dividend_amount=ui.dividend_credit,
+                    net_due=balance_due,
                     amount_paid=ui.amount_paid,
-                    balance_due=ui.net_amount_due - ui.amount_paid,
+                    balance_due=balance_due,
                     status=ui.status,
                 )
             )

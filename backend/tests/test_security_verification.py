@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from jose import jwt
 
 # Set test environment
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_chitflow.db")
 os.environ["ENVIRONMENT"] = "test"
 os.environ["SECRET_KEY"] = "test-verification-secret-key-32bytes-secure-2026"
 

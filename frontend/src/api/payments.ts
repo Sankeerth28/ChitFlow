@@ -16,6 +16,33 @@ function getApiBaseUrl(): string {
 
 const API_BASE_URL = getApiBaseUrl();
 
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+// Backend payment states are submitted/paid/rejected; the UI speaks pending/verified/rejected.
+const toUiStatus = (raw?: string): 'pending' | 'verified' | 'rejected' => {
+  switch ((raw || '').toLowerCase()) {
+    case 'paid':
+    case 'verified':
+      return 'verified';
+    case 'rejected':
+    case 'refunded':
+      return 'rejected';
+    default:
+      return 'pending';
+  }
+};
+
+const toApiStatus = (uiStatus?: string): string | undefined => {
+  if (!uiStatus || uiStatus === 'all') return undefined;
+  if (uiStatus === 'pending') return 'submitted';
+  if (uiStatus === 'verified') return 'paid';
+  return uiStatus;
+};
+
 function getAuthHeaders(): HeadersInit {
   const token = authStorage.getToken();
   return {
@@ -56,8 +83,8 @@ export async function fetchPayments(params?: {
   limit?: number;
 }): Promise<PaymentItem[]> {
   const query = new URLSearchParams();
-  const filter = params?.status || params?.status_filter;
-  if (filter && filter !== 'all') query.append('status_filter', filter);
+  const filter = toApiStatus(params?.status || params?.status_filter);
+  if (filter) query.append('status_filter', filter);
   if (params?.scheme_id) query.append('scheme_id', params.scheme_id);
   if (params?.member_id) query.append('member_id', params.member_id);
   if (params?.limit) query.append('limit', String(params.limit));
@@ -75,10 +102,13 @@ export async function fetchPayments(params?: {
   return data.map((p: any) => ({
     ...p,
     id: p.id || p.payment_id || p.receipt_number,
-    amount: p.amount ?? p.amount_received ?? 0,
+    amount: toNumber(p.amount ?? p.amount_received),
+    gross_subscription: toNumber(p.gross_subscription),
+    dividend_credit: toNumber(p.dividend_credit),
+    net_amount_due: toNumber(p.net_amount_due),
     payment_mode: p.payment_mode || p.payment_method || 'CASH',
     transaction_ref: p.transaction_ref || p.payment_reference_no || '',
-    status: p.status || (p.verification_status === 'paid' ? 'verified' : p.verification_status || 'pending'),
+    status: toUiStatus(p.verification_status || p.status),
   }));
 }
 

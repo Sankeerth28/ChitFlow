@@ -26,6 +26,7 @@ from app.models.entities import (
 )
 from app.schemas.payment import (
     PaymentSubmit,
+    PaymentRecordRequest,
     PaymentVerifyRequest,
     PaymentReceiptResponse,
     InstalmentResponse,
@@ -76,6 +77,7 @@ def list_payments(
 
         results.append(
             PaymentReceiptResponse(
+                payment_id=p.id,
                 receipt_number=p.receipt_number,
                 scheme_name=sch.scheme_name if sch else "Chit Scheme",
                 scheme_code=sch.scheme_code if sch else "CHIT",
@@ -163,6 +165,91 @@ def submit_payment(
     db.refresh(payment)
 
     return PaymentReceiptResponse(
+        payment_id=payment.id,
+        receipt_number=payment.receipt_number,
+        scheme_name=scheme.scheme_name,
+        scheme_code=scheme.scheme_code,
+        instalment_number=instalment.instalment_number,
+        member_name=member.full_name,
+        member_code=member.member_code,
+        gross_subscription=instalment.gross_subscription,
+        dividend_credit=instalment.dividend_credit,
+        net_amount_due=instalment.net_amount_due,
+        amount_received=payment.amount_received,
+        payment_method=payment.payment_method,
+        payment_reference_no=payment.payment_reference_no,
+        payment_date=payment.payment_date,
+        verification_status=payment.status,
+        created_at=payment.created_at,
+    )
+
+
+@router.post("", response_model=PaymentReceiptResponse, status_code=status.HTTP_201_CREATED)
+def record_payment(
+    payload: PaymentRecordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Record a subscription collection against a member's instalment.
+    Used by the member portal (submit payment proof) and by organisers/
+    accountants recording counter collections. The payment stays in
+    'submitted' status until verified, which is when the ledger is booked.
+    """
+    scheme_member = db.query(SchemeMember).filter(
+        SchemeMember.scheme_id == payload.scheme_id,
+        SchemeMember.member_id == payload.member_id,
+    ).first()
+    if not scheme_member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This subscriber is not enrolled in the selected chit scheme.",
+        )
+
+    scheme = scheme_member.scheme
+    member = scheme_member.member
+
+    if current_user.role == "member":
+        if not current_user.member_profile or current_user.member_profile.id != member.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only submit payments for your own instalments.",
+            )
+    elif current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    instalment = db.query(Instalment).filter(
+        Instalment.scheme_member_id == scheme_member.id,
+        Instalment.instalment_number == payload.instalment_number,
+    ).first()
+    if not instalment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Instalment #{payload.instalment_number} was not found for this subscriber in the selected scheme.",
+        )
+    if instalment.status == "paid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Instalment #{payload.instalment_number} is already fully paid.",
+        )
+
+    receipt_no = f"RCP-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    payment = Payment(
+        instalment_id=instalment.id,
+        member_id=member.id,
+        receipt_number=receipt_no,
+        amount_received=payload.amount,
+        payment_method=payload.payment_mode,
+        payment_reference_no=payload.transaction_ref,
+        payment_date=date.today(),
+        status="submitted",
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    return PaymentReceiptResponse(
+        payment_id=payment.id,
         receipt_number=payment.receipt_number,
         scheme_name=scheme.scheme_name,
         scheme_code=scheme.scheme_code,
@@ -285,6 +372,7 @@ def verify_payment(
     db.refresh(payment)
 
     return PaymentReceiptResponse(
+        payment_id=payment.id,
         receipt_number=payment.receipt_number,
         scheme_name=scheme.scheme_name,
         scheme_code=scheme.scheme_code,
@@ -330,6 +418,7 @@ def get_payment_receipt(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return PaymentReceiptResponse(
+        payment_id=payment.id,
         receipt_number=payment.receipt_number,
         scheme_name=scheme.scheme_name,
         scheme_code=scheme.scheme_code,

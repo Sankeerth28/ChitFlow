@@ -1,10 +1,10 @@
-from pydantic import BaseModel
 from decimal import Decimal
+from app.schemas.base import APIModel
 from typing import List, Optional
 from datetime import date, datetime
 
 
-class LedgerAccountResponse(BaseModel):
+class LedgerAccountResponse(APIModel):
     id: str
     account_code: str
     account_name: str
@@ -16,7 +16,7 @@ class LedgerAccountResponse(BaseModel):
         from_attributes = True
 
 
-class JournalLineResponse(BaseModel):
+class JournalLineResponse(APIModel):
     id: str
     account_code: str
     account_name: str
@@ -25,7 +25,7 @@ class JournalLineResponse(BaseModel):
     memo: Optional[str] = None
 
 
-class JournalEntryResponse(BaseModel):
+class JournalEntryResponse(APIModel):
     id: str
     entry_number: str
     transaction_date: date
@@ -38,7 +38,7 @@ class JournalEntryResponse(BaseModel):
     lines: List[JournalLineResponse] = []
 
 
-class TrialBalanceLine(BaseModel):
+class TrialBalanceLine(APIModel):
     account_code: str
     account_name: str
     account_type: str
@@ -47,7 +47,7 @@ class TrialBalanceLine(BaseModel):
     net_balance: Decimal
 
 
-class TrialBalanceResponse(BaseModel):
+class TrialBalanceResponse(APIModel):
     as_of_date: date
     lines: List[TrialBalanceLine]
     total_debits: Decimal

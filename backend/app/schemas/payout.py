@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
 from decimal import Decimal
+from app.schemas.base import APIModel
 from typing import Optional
 from datetime import date, datetime
 from enum import Enum
@@ -15,20 +16,20 @@ class PayoutStatus(str, Enum):
     FAILED = "failed"
 
 
-class PayoutSecurityVerifyRequest(BaseModel):
+class PayoutSecurityVerifyRequest(APIModel):
     security_type: str = Field(..., example="Guarantor_Salary_Certificate_and_Promissory_Note")
     security_doc_url: Optional[str] = Field(None, example="https://s3.chitflow.in/docs/surety-492.pdf")
     notes: Optional[str] = Field(None, example="Two government employee guarantors verified under Section 31.")
 
 
-class PayoutDisburseRequest(BaseModel):
+class PayoutDisburseRequest(APIModel):
     deductions_amount: Decimal = Field(default=Decimal('0.00'), ge=0)
     disbursement_method: str = Field(default="bank_transfer", example="bank_transfer")
     transaction_reference: str = Field(..., example="NEFT/CMS/2026110500412")
     disbursement_date: date = Field(default_factory=date.today)
 
 
-class PayoutResponse(BaseModel):
+class PayoutResponse(APIModel):
     id: str
     auction_id: str
     member_id: str

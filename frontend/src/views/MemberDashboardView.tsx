@@ -59,9 +59,9 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
     };
   }, [memberId, showToast]);
 
-  const totalPaid = enrolledChits.reduce((acc, c) => acc + (c.total_paid || 0), 0);
-  const totalDividend = enrolledChits.reduce((acc, c) => acc + (c.total_dividend_earned || 0), 0);
-  const totalNetDue = dues.reduce((acc, d) => acc + (d.net_due || 0), 0);
+  const totalPaid = enrolledChits.reduce((acc, c) => acc + Number(c.total_paid || 0), 0);
+  const totalDividend = enrolledChits.reduce((acc, c) => acc + Number(c.total_dividend_earned || 0), 0);
+  const totalNetDue = dues.reduce((acc, d) => acc + Number(d.net_due || 0), 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -71,7 +71,7 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
         style={{
           background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)',
           color: '#ffffff',
-          padding: '32px',
+          padding: 'clamp(18px, 5vw, 32px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
@@ -101,7 +101,7 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3" style={{ flexWrap: 'wrap', minWidth: 0 }}>
             <button
               onClick={() => onNavigateTab('receipts')}
               className="btn btn-interactive"
@@ -231,7 +231,7 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
       </div>
 
       {/* Two Columns: Active Schemes & Upcoming Dues */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: '20px' }}>
         {/* Left Column: My Enrolled Chits Summary */}
         <div className="card" style={{ padding: '20px' }}>
           <div className="flex justify-between items-center mb-4">

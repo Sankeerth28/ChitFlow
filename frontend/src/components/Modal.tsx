@@ -43,7 +43,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="flex items-center justify-center"
+      className="modal-overlay flex items-center justify-center"
       style={{
         position: 'fixed',
         top: 0,
@@ -118,7 +118,7 @@ export const Modal: React.FC<ModalProps> = ({
         <div
           style={{
             padding: '20px',
-            overflowY: 'auto',
+            overflow: 'auto',
             flex: 1,
           }}
         >

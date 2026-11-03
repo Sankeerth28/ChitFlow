@@ -17,6 +17,10 @@ import unittest
 from decimal import Decimal
 import sys
 import os
+
+# Never let the test suite drop/recreate the development database.
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_chitflow.db")
+
 from fastapi.testclient import TestClient
 from datetime import datetime, timedelta
 from jose import jwt

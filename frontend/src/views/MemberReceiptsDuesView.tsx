@@ -116,11 +116,13 @@ export const MemberReceiptsDuesView: React.FC<MemberReceiptsDuesViewProps> = ({ 
       </div>
 
       {/* Main Tabs */}
-      <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', gap: '24px' }}>
+      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '2px solid var(--border)', gap: '24px' }}>
         <button
           onClick={() => setActiveTab('receipts')}
           style={{
             padding: '12px 16px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'receipts' ? '3px solid var(--primary)' : '3px solid transparent',
@@ -141,6 +143,8 @@ export const MemberReceiptsDuesView: React.FC<MemberReceiptsDuesViewProps> = ({ 
           onClick={() => setActiveTab('dues')}
           style={{
             padding: '12px 16px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'dues' ? '3px solid var(--primary)' : '3px solid transparent',
