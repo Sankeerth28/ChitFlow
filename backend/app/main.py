@@ -1,4 +1,5 @@
 import os
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -26,10 +27,17 @@ ALLOW_DEMO_SEEDING = os.getenv("ALLOW_DEMO_SEEDING", "false").lower() in ("true"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Ensure tables exist
-    Base.metadata.create_all(bind=engine)
+    # Startup: Ensure tables exist with retry loop for cloud database availability
+    for attempt in range(1, 11):
+        try:
+            Base.metadata.create_all(bind=engine)
+            break
+        except Exception as e:
+            if attempt == 10:
+                raise e
+            time.sleep(2)
 
-    # In production environments, demo credentials and static seed records are strictly disabled
+    # In production environments, demo credentials and static seed records are strictly disabled unless explicitly allowed
     if ENVIRONMENT not in ("production", "prod") or ALLOW_DEMO_SEEDING:
         db = SessionLocal()
         try:
@@ -69,11 +77,12 @@ async def lifespan(app: FastAPI):
                     db.add(acc)
                 db.flush()
 
-                # Seed Default RBAC Users for development/testing only
+                # Seed Default RBAC Users for all 4 roles
                 users_to_seed = [
                     ("9999999999", "AdminPassword123!", "super_admin", None),
                     ("9849012345", "OrganiserPassword123!", "organiser", org.id),
                     ("9849012346", "AccountantPassword123!", "accountant", org.id),
+                    ("9876543204", "Member@3204!", "member", org.id),
                 ]
                 for mobile, pwd, role, org_id in users_to_seed:
                     u = User(
@@ -85,6 +94,21 @@ async def lifespan(app: FastAPI):
                         is_active=True,
                     )
                     db.add(u)
+                    db.flush()
+
+                    if role == "member":
+                        mem = Member(
+                            user_id=u.id,
+                            organiser_id=org.id,
+                            member_code="MEM-004",
+                            full_name="K. Venkat Rao",
+                            address_line1="Plot 42, Jubilee Hills",
+                            city="Hyderabad",
+                            state="Telangana",
+                            pincode="500033",
+                            kyc_status="verified",
+                        )
+                        db.add(mem)
 
                 db.commit()
         finally:
@@ -108,6 +132,7 @@ if ENVIRONMENT not in ("production", "prod") and "*" not in allowed_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
