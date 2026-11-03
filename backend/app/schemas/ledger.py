@@ -53,3 +53,4 @@ class TrialBalanceResponse(BaseModel):
     total_debits: Decimal
     total_credits: Decimal
     is_balanced: bool
+

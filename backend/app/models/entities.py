@@ -293,3 +293,15 @@ class JournalEntryLineRecord(Base):
     memo = Column(Text, nullable=True)
 
     journal_entry = relationship("JournalEntryRecord", back_populates="lines")
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    jti = Column(String(64), unique=True, index=True, nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    revoked_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
+

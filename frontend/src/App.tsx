@@ -1,7 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Building2,
-  Users,
   ShieldCheck,
   FileText,
   CheckCircle2,
@@ -10,8 +8,19 @@ import {
   BookOpen,
   Scale,
   Receipt,
-  UserCheck
+  UserCheck,
+  Lock,
+  LogOut,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
+import {
+  loginUser,
+  getCurrentUser,
+  logoutUser,
+  authStorage,
+  type UserProfile,
+} from './api/auth';
 
 // Indian Currency Formatter
 const formatINR = (val: number | string) => {
@@ -26,10 +35,20 @@ const formatINR = (val: number | string) => {
 };
 
 export function App() {
-  // Navigation & Role State
-  const [activeRole, setActiveRole] = useState<'organiser' | 'member'>('organiser');
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Login Form State
+  const [loginMobile, setLoginMobile] = useState('9849012345');
+  const [loginPassword, setLoginPassword] = useState('OrganiserPassword123!');
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+
+  // Navigation & View State
   const [language, setLanguage] = useState<'en' | 'te'>('en');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'schemes' | 'auctions' | 'payments' | 'ledger'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'schemes' | 'auctions' | 'payments' | 'ledger' | 'audit'>('dashboard');
 
   // Scheme Configuration State
   const [chitValue, setChitValue] = useState(100000);
@@ -41,7 +60,7 @@ export function App() {
   const [auctionNumber, setAuctionNumber] = useState(2);
   const [auctionConfirmed, setAuctionConfirmed] = useState(true);
 
-  // Deterministic Math Engine on Client
+  // Deterministic Math Engine
   const monthlySubscription = chitValue / totalMembers;
   const isMonth1Foreman = auctionNumber === 1;
 
@@ -57,10 +76,27 @@ export function App() {
     : Math.round((dividendPool - dividendPerMember * totalMembers) * 100) / 100;
   const netMonthlyContribution = monthlySubscription - dividendPerMember;
 
-  // Payment Status State
+  // Receipt Modal State
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
-  // Quick preset loader
+  // Check initial session
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const user = await getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+        }
+      } catch {
+        authStorage.clearToken();
+      } finally {
+        setAuthChecking(false);
+      }
+    }
+    checkAuth();
+  }, []);
+
+  // Quick preset loader for Scheme A / B
   const loadPreset = (preset: 'A' | 'B') => {
     if (preset === 'A') {
       setChitValue(100000);
@@ -79,26 +115,64 @@ export function App() {
     }
   };
 
+  // Login Handler
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const data = await loginUser(loginMobile, loginPassword);
+      setCurrentUser(data.user);
+    } catch (err: any) {
+      setAuthError(err.message || 'Login failed. Please check mobile and password.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Demo Login Quick-Fill
+  const quickFillLogin = (role: 'organiser' | 'member' | 'accountant' | 'super_admin') => {
+    setAuthError(null);
+    if (role === 'organiser') {
+      setLoginMobile('9849012345');
+      setLoginPassword('OrganiserPassword123!');
+    } else if (role === 'member') {
+      setLoginMobile('9876543204');
+      setLoginPassword('Member@3204!');
+    } else if (role === 'accountant') {
+      setLoginMobile('9849012346');
+      setLoginPassword('AccountantPassword123!');
+    } else if (role === 'super_admin') {
+      setLoginMobile('9999999999');
+      setLoginPassword('AdminPassword123!');
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    setAuthError(null);
+  };
+
   // Translations
   const t = {
     en: {
       appName: 'ChitFlow',
       appMotto: 'Every Chit. Every Member. Every Rupee. Accounted For.',
       statutoryBadge: 'Chit Funds Act, 1982 Compliant (Telangana)',
-      organiserView: 'Organiser Portal',
-      memberView: 'Member Portal (M-004)',
       tabDashboard: 'Overview',
       tabSchemes: 'Chit Schemes',
       tabAuctions: 'Monthly Auctions',
       tabPayments: 'Collections & Receipts',
       tabLedger: 'General Ledger',
-      memberGreeting: 'Welcome, K. Venkat Rao (Member M-004)',
+      tabAudit: 'Audit Logs',
       tenSecDashboard: 'Member 10-Second Financial Position',
       activeChits: 'Active Chits',
       monthlyPaymentDue: 'Monthly Payment Due',
       totalPaid: 'Total Paid to Date',
       totalDividends: 'Total Dividends Received',
-      nextDueDate: 'Next Due Date',
       plainEnglishExpl: `Your ${formatINR(dividendPerMember)} dividend has been deducted from this month's ${formatINR(monthlySubscription)} payment. Net amount payable is ${formatINR(netMonthlyContribution)}.`,
       statutoryCapNotice: 'Statutory Verification: Commission 4.0% ≤ 5.0% cap | Discount 26.0% ≤ 30.0% ceiling',
     },
@@ -106,28 +180,194 @@ export function App() {
       appName: 'చిట్ ఫ్లో (ChitFlow)',
       appMotto: 'ప్రతి చిట్. ప్రతి సభ్యుడు. ప్రతి రూపాయి. పారదర్శకంగా.',
       statutoryBadge: 'చిట్ ఫండ్ల చట్టం 1982 నిబంధనలకు లోబడి (తెలంగాణ)',
-      organiserView: 'నిర్వాహకుల పోర్టల్',
-      memberView: 'సభ్యుల పోర్టల్ (M-004)',
       tabDashboard: 'సమీక్ష',
       tabSchemes: 'చిట్ పథకాలు',
       tabAuctions: 'నెలవారీ వేలం',
       tabPayments: 'రసీదులు & చెల్లింపులు',
       tabLedger: 'లెడ్జర్ ఖాతాలు',
-      memberGreeting: 'స్వాగతం, కె. వెంకట్ రావు (సభ్యుడు M-004)',
+      tabAudit: 'ఆడిట్ రికార్డులు',
       tenSecDashboard: 'సభ్యుల 10-సెకన్ల ఆర్థిక సమాచారం',
       activeChits: 'యాక్టివ్ చిట్లు',
       monthlyPaymentDue: 'ఈ నెల చెల్లించవలసిన మొత్తం',
       totalPaid: 'ఇప్పటివరకు చెల్లించినది',
       totalDividends: 'పొందిన మొత్తం డివిడెండ్',
-      nextDueDate: 'తదుపరి చెల్లింపు తేదీ',
       plainEnglishExpl: `ఈ నెల ${formatINR(monthlySubscription)} చెల్లింపు నుండి మీ డివిడెండ్ ${formatINR(dividendPerMember)} మినహాయించబడింది. మీరు చెల్లించవలసిన నికర మొత్తం ${formatINR(netMonthlyContribution)}.`,
       statutoryCapNotice: 'చట్టబద్ధ తనిఖీ: నిర్వాహక కమీషన్ 4.0% ≤ 5.0% | వేలం తగ్గింపు 26.0% ≤ 30.0%',
     }
   }[language];
 
+  if (authChecking) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--background)' }}>
+        <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>Verifying ChitFlow secure session...</p>
+      </div>
+    );
+  }
+
+  // ==================== UNAUTHENTICATED: LOGIN VIEW ====================
+  if (!currentUser) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)' }}>
+        <header style={{ backgroundColor: 'var(--primary)', color: '#ffffff', padding: '16px 24px' }}>
+          <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Scale size={28} color="#4299e1" />
+              <div>
+                <h1 style={{ fontSize: '22px', fontWeight: 700 }}>{t.appName}</h1>
+                <p style={{ fontSize: '11px', color: '#a0aec0' }}>{t.appMotto}</p>
+              </div>
+            </div>
+            <span style={{ fontSize: '11px', backgroundColor: '#21865a', color: '#ffffff', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+              {t.statutoryBadge}
+            </span>
+          </div>
+        </header>
+
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '440px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'inline-flex', padding: '12px', borderRadius: '50%', backgroundColor: 'var(--surface-alt)', marginBottom: '12px' }}>
+                <Lock size={28} color="var(--primary)" />
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)' }}>Secure Authentication Portal</h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Enter registered mobile number and password</p>
+            </div>
+
+            {authError && (
+              <div style={{ backgroundColor: 'var(--error-bg)', border: '1px solid #f8d7da', padding: '12px', borderRadius: '6px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--error)', fontSize: '13px' }}>
+                <AlertTriangle size={16} />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Registered Mobile Number</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 9849012345"
+                  value={loginMobile}
+                  onChange={(e) => setLoginMobile(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Password / PIN</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowRecoveryModal(true)}
+                    style={{ fontSize: '12px', color: 'var(--secondary)', fontWeight: 600 }}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter your password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                style={{
+                  width: '100%',
+                  backgroundColor: 'var(--primary)',
+                  color: '#ffffff',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  opacity: authLoading ? 0.7 : 1
+                }}
+              >
+                {authLoading ? 'Authenticating...' : 'Sign In to ChitFlow'}
+              </button>
+            </form>
+
+            {/* Quick Demo Role Logins */}
+            <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '10px' }}>
+                QA Reviewer / Demo Quick Login:
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('organiser')}
+                  style={{ padding: '8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'var(--surface-alt)', fontWeight: 600, color: 'var(--primary)' }}
+                >
+                  🏢 Organiser Demo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('member')}
+                  style={{ padding: '8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'var(--surface-alt)', fontWeight: 600, color: 'var(--primary)' }}
+                >
+                  👤 Member Demo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('accountant')}
+                  style={{ padding: '8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'var(--surface-alt)', fontWeight: 600, color: 'var(--primary)' }}
+                >
+                  💼 Accountant Demo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('super_admin')}
+                  style={{ padding: '8px', fontSize: '12px', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'var(--surface-alt)', fontWeight: 600, color: 'var(--primary)' }}
+                >
+                  🛡️ Super Admin
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Account Recovery Notice Modal */}
+        {showRecoveryModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '24px', maxWidth: '420px', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--warning)', marginBottom: '12px' }}>
+                <Info size={24} />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary)' }}>Account Recovery Policy</h3>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                Per ChitFlow statutory security rules, OTP gateways are not configured in local development.
+                To reset your password or PIN, please contact your registered Chit Fund Foreman administrator.
+              </p>
+              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowRecoveryModal(false)}
+                  style={{ backgroundColor: 'var(--primary)', color: '#ffffff', padding: '8px 16px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}
+                >
+                  Understood
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ==================== AUTHENTICATED PORTAL VIEW ====================
+  const userRole = currentUser.role;
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)' }}>
-      {/* Top Banner & Header */}
+      {/* Header */}
       <header style={{ backgroundColor: 'var(--primary)', color: '#ffffff', padding: '12px 24px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div>
@@ -172,95 +412,107 @@ export function App() {
               </button>
             </div>
 
-            {/* Role Switcher */}
-            <div style={{ display: 'flex', backgroundColor: '#1e3552', borderRadius: '6px', padding: '2px' }}>
+            {/* Authenticated User Profile Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#1e3552', padding: '4px 12px', borderRadius: '20px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, display: 'block' }}>
+                  {currentUser.full_name || currentUser.mobile_number}
+                </span>
+                <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#63b3ed', fontWeight: 700 }}>
+                  ROLE: {currentUser.role}
+                </span>
+              </div>
               <button
-                onClick={() => setActiveRole('organiser')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  backgroundColor: activeRole === 'organiser' ? '#ffffff' : 'transparent',
-                  color: activeRole === 'organiser' ? 'var(--primary)' : '#ffffff'
-                }}
+                onClick={handleLogout}
+                title="Log out and invalidate session"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#e53e3e', color: '#ffffff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}
               >
-                <Building2 size={16} />
-                {t.organiserView}
-              </button>
-              <button
-                onClick={() => setActiveRole('member')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  backgroundColor: activeRole === 'member' ? '#ffffff' : 'transparent',
-                  color: activeRole === 'member' ? 'var(--primary)' : '#ffffff'
-                }}
-              >
-                <Users size={16} />
-                {t.memberView}
+                <LogOut size={12} /> Logout
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Navigation Tabs (Organiser) */}
-      {activeRole === 'organiser' && (
-        <nav style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', gap: '8px', padding: '0 24px' }}>
-            {[
-              { id: 'dashboard', label: t.tabDashboard, icon: TrendingUp },
-              { id: 'schemes', label: t.tabSchemes, icon: BookOpen },
-              { id: 'auctions', label: t.tabAuctions, icon: Scale },
-              { id: 'payments', label: t.tabPayments, icon: Receipt },
-              { id: 'ledger', label: t.tabLedger, icon: FileText },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
+      {/* Role-Specific Navigation Bar */}
+      <nav style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', gap: '8px', padding: '0 24px' }}>
+          {userRole === 'member' ? (
+            /* Member Navigation */
+            <>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'dashboard' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <TrendingUp size={16} /> My 10-Second Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab('schemes')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'schemes' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'schemes' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <BookOpen size={16} /> My Enrolled Chits
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'payments' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'payments' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <Receipt size={16} /> My Receipts & Dues
+              </button>
+            </>
+          ) : (
+            /* Organiser / Accountant / Super Admin Navigation */
+            <>
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'dashboard' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <TrendingUp size={16} /> {t.tabDashboard}
+              </button>
+              <button
+                onClick={() => setActiveTab('schemes')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'schemes' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'schemes' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <BookOpen size={16} /> {t.tabSchemes}
+              </button>
+              {userRole !== 'accountant' && (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '12px 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                    borderBottom: isActive ? '3px solid var(--secondary)' : '3px solid transparent',
-                    transition: 'all 0.15s ease'
-                  }}
+                  onClick={() => setActiveTab('auctions')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'auctions' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'auctions' ? '3px solid var(--secondary)' : '3px solid transparent' }}
                 >
-                  <Icon size={16} />
-                  {tab.label}
+                  <Scale size={16} /> {t.tabAuctions}
                 </button>
-              );
-            })}
-          </div>
-        </nav>
-      )}
+              )}
+              <button
+                onClick={() => setActiveTab('payments')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'payments' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'payments' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <Receipt size={16} /> {t.tabPayments}
+              </button>
+              <button
+                onClick={() => setActiveTab('ledger')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: activeTab === 'ledger' ? 'var(--primary)' : 'var(--text-secondary)', borderBottom: activeTab === 'ledger' ? '3px solid var(--secondary)' : '3px solid transparent' }}
+              >
+                <FileText size={16} /> {t.tabLedger}
+              </button>
+            </>
+          )}
+        </div>
+      </nav>
 
       {/* Main Content Area */}
       <main style={{ maxWidth: '1280px', margin: '24px auto', padding: '0 24px', flex: 1, width: '100%' }}>
-        {activeRole === 'member' ? (
-          /* ==================== MEMBER VIEW ==================== */
+        {userRole === 'member' ? (
+          /* ==================== MEMBER PORTAL ==================== */
           <div>
             <div style={{ backgroundColor: 'var(--surface)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)' }}>{t.memberGreeting}</h2>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Enrolled in: PRD Scheme A (Chit Value: ₹1,00,000 | Ticket #4)</p>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--primary)' }}>
+                    Welcome, {currentUser.full_name || 'Subscriber'} (Member #{currentUser.member_id ? currentUser.member_id.slice(0, 6) : 'M-004'})
+                  </h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    Organisation: Sri Balaji Chit Funds Pvt. Ltd. | Mobile: {currentUser.mobile_number}
+                  </p>
                 </div>
                 <span style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '6px 12px', borderRadius: '6px', fontWeight: 600, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <UserCheck size={16} /> KYC Verified
@@ -349,11 +601,10 @@ export function App() {
             </div>
           </div>
         ) : (
-          /* ==================== ORGANISER VIEW ==================== */
+          /* ==================== ORGANISER / ACCOUNTANT PORTAL ==================== */
           <div>
             {activeTab === 'dashboard' && (
               <div>
-                {/* 8 PRD Organiser KPI Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                   <div style={{ backgroundColor: 'var(--surface)', padding: '18px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                     <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>Active Chit Schemes</span>
@@ -458,15 +709,14 @@ export function App() {
               </div>
             )}
 
-            {activeTab === 'auctions' && (
+            {activeTab === 'auctions' && userRole !== 'accountant' && (
               <div>
-                {/* Monthly Auction Console */}
                 <div style={{ backgroundColor: 'var(--surface)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <div>
                       <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>Monthly Auction Console (PRD Module 5)</h2>
                       <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                        Execute deterministic auction calculations compliant with Chit Funds (Amendment) Act, 2019 (Max 30% discount limit)
+                        Execute deterministic auction calculations compliant with Chit Funds (Amendment) Act, 2019
                       </p>
                     </div>
                     <span style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '6px 12px', borderRadius: '6px', fontWeight: 600, fontSize: '13px' }}>
@@ -474,7 +724,6 @@ export function App() {
                     </span>
                   </div>
 
-                  {/* Auction Input Form */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                     <div>
                       <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Auction Number</label>
@@ -533,7 +782,6 @@ export function App() {
                     </div>
                   </div>
 
-                  {/* Deterministic Calculation Result Matrix */}
                   <div style={{ backgroundColor: 'var(--surface-alt)', padding: '20px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: 'var(--primary)' }}>
                       Deterministic Calculation Engine Output (Paise Quantized)
@@ -583,7 +831,6 @@ export function App() {
                     </div>
                   </div>
 
-                  {/* Confirmation Button */}
                   <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                     <button
                       onClick={() => {
@@ -611,7 +858,6 @@ export function App() {
 
             {activeTab === 'ledger' && (
               <div>
-                {/* General Ledger & Real-Time Trial Balance */}
                 <div style={{ backgroundColor: 'var(--surface)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border)', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <div>
@@ -755,7 +1001,14 @@ export function App() {
             {activeTab === 'schemes' && (
               <div>
                 <div style={{ backgroundColor: 'var(--surface)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: 'var(--primary)' }}>Chit Scheme Lifecycle (PRD Module 3)</h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>Chit Scheme Lifecycle (PRD Module 3)</h2>
+                    {userRole === 'accountant' && (
+                      <span style={{ fontSize: '12px', color: 'var(--warning)', fontWeight: 600, backgroundColor: 'var(--warning-bg)', padding: '4px 8px', borderRadius: '4px' }}>
+                        Accountant View: Read-Only Scheme Rules
+                      </span>
+                    )}
+                  </div>
                   <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '6px', marginBottom: '16px', backgroundColor: 'var(--surface-alt)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>

@@ -338,3 +338,4 @@ class LedgerEngine:
         )
         entry.validate_balance()
         return entry
+

@@ -1,18 +1,111 @@
-# Virtual environment
-.venv/
-__pycache__/
-*.pyc
+# ==============================================================================
+# ChitFlow Root .gitignore
+# Prevents accidental commits of secrets, local databases, dependencies & uploads
+# ==============================================================================
 
-# Node
+# --- Environment & Secret Configuration ---
+.env
+.env.*
+!.env.example
+!.env.template
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# --- Python Generated Files & Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+backend/.venv/
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+
+# --- Node.js & Frontend Artifacts ---
+node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# SQLite
+# --- Local Databases & Dumps ---
 *.db
+*.db-journal
+*.sqlite
 *.sqlite3
+*.sql
+*.dump
+chitflow.db
+backend/chitflow.db
 
-# OS / Editor
+# --- Uploaded Financial & KYC Documents ---
+uploads/
+storage/
+receipts/
+kyc/
+documents/
+media/
+backend/uploads/
+backend/receipts/
+backend/kyc/
+
+# --- Logs & Runtime Data ---
+*.log
+logs/
+
+# --- Operating System & Editor Files ---
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 .vscode/
+!.vscode/extensions.json
 .idea/
+*.swp
+*.swo
+*~

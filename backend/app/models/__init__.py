@@ -13,4 +13,5 @@ from app.models.entities import (
     LedgerAccount,
     JournalEntryRecord,
     JournalEntryLineRecord,
+    RevokedToken,
 )

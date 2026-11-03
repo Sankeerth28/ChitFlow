@@ -6,8 +6,14 @@ from decimal import Decimal
 import uuid
 
 from app.db.session import get_db
-from app.api.deps import get_current_organiser
+from app.api.deps import (
+    get_current_user,
+    get_current_active_organiser,
+    require_role,
+    verify_member_access,
+)
 from app.models.entities import (
+    User,
     Organiser,
     Instalment,
     Payment,
@@ -33,14 +39,15 @@ router = APIRouter(prefix="/payments", tags=["Payments & Receipts"])
 def list_member_instalments(
     member_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    member = db.query(Member).filter(
-        Member.id == member_id,
-        Member.organiser_id == organiser.id,
-    ).first()
-    if not member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")
+    """
+    List instalments for a member.
+    Enforces strict zero-trust privacy check:
+    - Member can ONLY view their own instalments (Fixes IDOR BUG-002).
+    - Organiser/Accountant can view only within their tenant organisation.
+    """
+    member = verify_member_access(member_id=member_id, current_user=current_user, db=db)
 
     scheme_member_ids = [sm.id for sm in member.enrolled_schemes]
     if not scheme_member_ids:
@@ -55,8 +62,9 @@ def list_member_instalments(
 def submit_payment(
     payload: PaymentSubmit,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
+    """Submit payment reference for an instalment."""
     instalment = db.query(Instalment).filter(Instalment.id == payload.instalment_id).first()
     if not instalment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instalment record not found.")
@@ -65,8 +73,16 @@ def submit_payment(
     scheme = scheme_member.scheme
     member = scheme_member.member
 
-    if scheme.organiser_id != organiser.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    # Access authorization
+    if current_user.role == "member":
+        if not current_user.member_profile or current_user.member_profile.id != member.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only submit payments for your own instalments.",
+            )
+    else:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     receipt_no = f"RCP-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -109,14 +125,19 @@ def verify_payment(
     payment_id: str,
     payload: PaymentVerifyRequest,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
 ):
+    """
+    Verify & book payment. Restricted strictly to Organisers and Accountants.
+    Members are strictly forbidden from verifying payments.
+    """
     payment = db.query(Payment).join(Instalment).join(SchemeMember).join(ChitScheme).filter(
         Payment.id == payment_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment record not found under your organisation.")
 
     if payment.status == "paid":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is already verified and paid.")
@@ -128,12 +149,12 @@ def verify_payment(
 
     payment.status = payload.status.value
     payment.verification_notes = payload.verification_notes
+    payment.verified_by = current_user.id
 
     if payload.status.value == "paid":
         instalment.amount_paid = payment.amount_received
         instalment.status = "paid"
 
-        # Map payment method enum
         method_map = {
             "cash": PaymentMethod.CASH,
             "upi": PaymentMethod.UPI,
@@ -164,6 +185,7 @@ def verify_payment(
             reference_entity_type="payment",
             reference_entity_id=payment.id,
             is_reversal=False,
+            created_by=current_user.id,
         )
         db.add(je_record)
         db.flush()
@@ -216,6 +238,7 @@ def verify_payment(
         payment_reference_no=payment.payment_reference_no,
         payment_date=payment.payment_date,
         verification_status=payment.status,
+        verified_by_name=current_user.role.upper(),
         created_at=payment.created_at,
     )
 
@@ -224,11 +247,10 @@ def verify_payment(
 def get_payment_receipt(
     receipt_number: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
     payment = db.query(Payment).join(Instalment).join(SchemeMember).join(ChitScheme).filter(
         Payment.receipt_number == receipt_number,
-        ChitScheme.organiser_id == organiser.id,
     ).first()
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found.")
@@ -237,6 +259,14 @@ def get_payment_receipt(
     scheme_member = instalment.scheme_member
     scheme = scheme_member.scheme
     member = scheme_member.member
+
+    # Ownership check
+    if current_user.role == "member":
+        if not current_user.member_profile or current_user.member_profile.id != member.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return PaymentReceiptResponse(
         receipt_number=payment.receipt_number,

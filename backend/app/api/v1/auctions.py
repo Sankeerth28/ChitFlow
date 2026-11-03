@@ -5,8 +5,13 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from app.db.session import get_db
-from app.api.deps import get_current_organiser
+from app.api.deps import (
+    get_current_user,
+    get_current_active_organiser,
+    require_role,
+)
 from app.models.entities import (
+    User,
     Organiser,
     ChitScheme,
     SchemeMember,
@@ -41,14 +46,23 @@ router = APIRouter(prefix="/auctions", tags=["Auctions"])
 def list_scheme_auctions(
     scheme_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    scheme = db.query(ChitScheme).filter(
-        ChitScheme.id == scheme_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    scheme = db.query(ChitScheme).filter(ChitScheme.id == scheme_id).first()
     if not scheme:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found.")
+
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        # Member role
+        enrolled = db.query(SchemeMember).filter(
+            SchemeMember.scheme_id == scheme.id,
+            SchemeMember.member_id == current_user.member_profile.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return db.query(Auction).filter(Auction.scheme_id == scheme.id).order_by(Auction.auction_number).all()
 
@@ -57,14 +71,24 @@ def list_scheme_auctions(
 def get_auction(
     auction_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    auction = db.query(Auction).join(ChitScheme).filter(
-        Auction.id == auction_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    auction = db.query(Auction).filter(Auction.id == auction_id).first()
     if not auction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auction not found.")
+
+    scheme = auction.scheme
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        enrolled = db.query(SchemeMember).filter(
+            SchemeMember.scheme_id == scheme.id,
+            SchemeMember.member_id == current_user.member_profile.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
     return auction
 
 
@@ -72,14 +96,23 @@ def get_auction(
 def list_auction_bids(
     auction_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    auction = db.query(Auction).join(ChitScheme).filter(
-        Auction.id == auction_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    auction = db.query(Auction).filter(Auction.id == auction_id).first()
     if not auction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auction not found.")
+
+    scheme = auction.scheme
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        enrolled = db.query(SchemeMember).filter(
+            SchemeMember.scheme_id == scheme.id,
+            SchemeMember.member_id == current_user.member_profile.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return db.query(AuctionBid).filter(AuctionBid.auction_id == auction.id).order_by(AuctionBid.bid_discount_amount.desc()).all()
 
@@ -89,16 +122,30 @@ def submit_auction_bid(
     auction_id: str,
     payload: AuctionBidCreate,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    auction = db.query(Auction).join(ChitScheme).filter(
-        Auction.id == auction_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    """
+    Submit an auction bid.
+    - If caller is a Member, they can ONLY bid on their own behalf.
+    - If caller is Organiser/Accountant, they can record bids for their enrolled scheme subscribers.
+    """
+    auction = db.query(Auction).filter(Auction.id == auction_id).first()
     if not auction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auction not found.")
 
     scheme = auction.scheme
+
+    # Multi-tenant and member ownership check
+    if current_user.role == "member":
+        if not current_user.member_profile or current_user.member_profile.id != payload.member_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Members can only submit bids for their own registered ticket.",
+            )
+    else:
+        # Organiser / Accountant
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     # Section 15 check: Month 1 is reserved for Foreman
     if auction.auction_number == 1:
@@ -156,14 +203,23 @@ def confirm_auction(
     auction_id: str,
     payload: AuctionConfirmRequest,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser"])),
 ):
+    """
+    Confirm winning auction bid. Restricted strictly to Organisers.
+    - Executes deterministic financial engine.
+    - Locks auction status and prevents duplicate finalisation.
+    - Creates prize payout record.
+    - Generates balanced double-entry general ledger journal entries.
+    - Generates next month member instalment dues.
+    """
     auction = db.query(Auction).join(ChitScheme).filter(
         Auction.id == auction_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not auction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auction not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auction not found under your organisation.")
 
     if auction.status == "confirmed":
         raise HTTPException(
@@ -179,14 +235,14 @@ def confirm_auction(
         Member.organiser_id == organiser.id,
     ).first()
     if not winning_member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Winning member not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Winning member not found under your organisation.")
 
     scheme_member = db.query(SchemeMember).filter(
         SchemeMember.scheme_id == scheme.id,
         SchemeMember.member_id == winning_member.id,
     ).first()
     if not scheme_member:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Winning member is not enrolled in scheme.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Winning member is not enrolled in this scheme.")
 
     if scheme_member.has_prized and auction.auction_number > 1:
         raise HTTPException(
@@ -194,7 +250,6 @@ def confirm_auction(
             detail="Winning member has already prized in an earlier auction.",
         )
 
-    # Initialize calculation engine config
     config = ChitSchemeConfig(
         chit_value=Decimal(str(scheme.chit_value)),
         duration_months=scheme.duration_months,
@@ -249,7 +304,6 @@ def confirm_auction(
         winning_member_code=winning_member.member_code,
     )
 
-    # Save Journal Entry in Database
     je_record = JournalEntryRecord(
         organiser_id=organiser.id,
         entry_number=f"JE-AUC-{scheme.scheme_code}-{auction.auction_number:02d}",
@@ -258,6 +312,7 @@ def confirm_auction(
         reference_entity_type="auction",
         reference_entity_id=auction.id,
         is_reversal=False,
+        created_by=current_user.id,
     )
     db.add(je_record)
     db.flush()
@@ -270,7 +325,6 @@ def confirm_auction(
         ).first()
 
         if not account:
-            # Auto-create standard COA account if missing
             acc_type = "expense" if line.account_code.startswith("5") else (
                 "revenue" if line.account_code.startswith("4") else (
                     "liability" if line.account_code.startswith("2") else "asset"
@@ -299,7 +353,6 @@ def confirm_auction(
     next_m = auction.auction_number + 1
     if next_m <= scheme.duration_months:
         all_scheme_members = db.query(SchemeMember).filter(SchemeMember.scheme_id == scheme.id).all()
-        # Compute due date
         start = scheme.start_date
         year = start.year + (start.month + next_m - 2) // 12
         month = (start.month + next_m - 2) % 12 + 1
@@ -307,7 +360,6 @@ def confirm_auction(
         due_date = date(year, month, day)
 
         for sm in all_scheme_members:
-            # Check if instalment already exists
             existing_inst = db.query(Instalment).filter(
                 Instalment.scheme_member_id == sm.id,
                 Instalment.instalment_number == next_m,

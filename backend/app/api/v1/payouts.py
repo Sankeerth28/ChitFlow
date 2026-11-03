@@ -5,8 +5,13 @@ from datetime import date
 from decimal import Decimal
 
 from app.db.session import get_db
-from app.api.deps import get_current_organiser
+from app.api.deps import (
+    get_current_user,
+    get_current_active_organiser,
+    require_role,
+)
 from app.models.entities import (
+    User,
     Organiser,
     Payout,
     Auction,
@@ -29,11 +34,25 @@ router = APIRouter(prefix="/payouts", tags=["Prize Payouts"])
 @router.get("", response_model=List[PayoutResponse])
 def list_payouts(
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    payouts = db.query(Payout).join(Auction).join(ChitScheme).filter(
-        ChitScheme.organiser_id == organiser.id
-    ).order_by(Payout.created_at.desc()).all()
+    """
+    List prize payouts.
+    - If Organiser/Accountant: returns payouts within their tenant organisation.
+    - If Member: returns ONLY payouts awarded to the authenticated subscriber.
+    """
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        query = db.query(Payout).join(Auction).join(ChitScheme)
+        if current_user.role != "super_admin":
+            query = query.filter(ChitScheme.organiser_id == current_user.organiser_id)
+        payouts = query.order_by(Payout.created_at.desc()).all()
+    else:
+        # Member role
+        if not current_user.member_profile:
+            return []
+        payouts = db.query(Payout).filter(
+            Payout.member_id == current_user.member_profile.id
+        ).order_by(Payout.created_at.desc()).all()
 
     results = []
     for p in payouts:
@@ -64,17 +83,23 @@ def verify_payout_security(
     payout_id: str,
     payload: PayoutSecurityVerifyRequest,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser"])),
 ):
+    """
+    Sign off prized subscriber security under Section 31 of Chit Funds Act, 1982.
+    Restricted strictly to Organiser Foreman.
+    """
     payout = db.query(Payout).join(Auction).join(ChitScheme).filter(
         Payout.id == payout_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not payout:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payout record not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payout record not found under your organisation.")
 
     payout.security_type = payload.security_type
     payout.security_doc_url = payload.security_doc_url
+    payout.security_verified_by = current_user.id
     payout.status = "security_verified"
     db.commit()
     db.refresh(payout)
@@ -103,19 +128,24 @@ def disburse_payout(
     payout_id: str,
     payload: PayoutDisburseRequest,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser"])),
 ):
+    """
+    Disburse prize payout. Restricted strictly to Organisers.
+    Enforces Section 31 pre-condition: security must be verified prior to fund release.
+    """
     payout = db.query(Payout).join(Auction).join(ChitScheme).filter(
         Payout.id == payout_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not payout:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payout record not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payout record not found under your organisation.")
 
     if payout.status not in ["security_verified", "approved"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot disburse: Payout status is '{payout.status}'. Section 31 security must be verified first.",
+            detail=f"Cannot disburse: Payout status is '{payout.status}'. Section 31 security sign-off required.",
         )
 
     auction = payout.auction
@@ -150,6 +180,7 @@ def disburse_payout(
         reference_entity_type="payout",
         reference_entity_id=payout.id,
         is_reversal=False,
+        created_by=current_user.id,
     )
     db.add(je_record)
     db.flush()

@@ -7,8 +7,13 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.db.session import get_db
-from app.api.deps import get_current_organiser
+from app.api.deps import (
+    get_current_user,
+    get_current_active_organiser,
+    require_role,
+)
 from app.models.entities import (
+    User,
     Organiser,
     ChitScheme,
     Member,
@@ -44,7 +49,8 @@ class OrganiserDashboardMetrics(BaseModel):
 @router.get("/dashboard/organiser", response_model=OrganiserDashboardMetrics)
 def get_organiser_dashboard(
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
 ):
     """
     PRD Module 2: Organiser Dashboard Cards
@@ -56,6 +62,7 @@ def get_organiser_dashboard(
     - Pending Payouts
     - Outstanding Amount
     - Recorded Organiser Commission
+    Strictly scoped to the caller's tenant organisation.
     """
     active_chits = db.query(ChitScheme).filter(
         ChitScheme.organiser_id == organiser.id,
@@ -64,28 +71,22 @@ def get_organiser_dashboard(
 
     total_members = db.query(Member).filter(Member.organiser_id == organiser.id).count()
 
-    # Upcoming auctions
     upcoming_auctions = db.query(Auction).join(ChitScheme).filter(
         ChitScheme.organiser_id == organiser.id,
         Auction.status == "scheduled",
     ).count()
 
-    # Pending payouts
     pending_payouts = db.query(Payout).join(Auction).join(ChitScheme).filter(
         ChitScheme.organiser_id == organiser.id,
         Payout.status.in_(["awaiting_security", "security_verified", "approved"]),
     ).count()
 
-    # Instalments aggregate
-    all_instalments = db.query(Instalment).join(ChitScheme, Instalment.auction_id == Auction.id).filter(
-        Auction.scheme_id == ChitScheme.id,
-        ChitScheme.organiser_id == organiser.id,
-    ).all()
-
-    # Sum collections
+    # Sum collections for this organiser (Fixes join bug BUG-004)
     monthly_collections = db.query(func.coalesce(func.sum(Payment.amount_received), 0)).join(
-        Instalment
-    ).join(Auction, Instalment.auction_id == Auction.id).join(
+        Instalment, Payment.instalment_id == Instalment.id
+    ).join(
+        Auction, Instalment.auction_id == Auction.id
+    ).join(
         ChitScheme, Auction.scheme_id == ChitScheme.id
     ).filter(
         ChitScheme.organiser_id == organiser.id,
@@ -93,7 +94,9 @@ def get_organiser_dashboard(
     ).scalar()
 
     # Sum pending & outstanding
-    unpaid_instalments = db.query(Instalment).join(Auction, Instalment.auction_id == Auction.id).join(
+    unpaid_instalments = db.query(Instalment).join(
+        Auction, Instalment.auction_id == Auction.id
+    ).join(
         ChitScheme, Auction.scheme_id == ChitScheme.id
     ).filter(
         ChitScheme.organiser_id == organiser.id,
@@ -127,10 +130,11 @@ def get_organiser_dashboard(
 @router.get("/trial-balance", response_model=TrialBalanceResponse)
 def get_trial_balance(
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
 ):
     """
-    Generate real-time double-entry Trial Balance across all ledger accounts.
+    Generate real-time double-entry Trial Balance for the caller's organisation.
     Guarantees sum(Debits) == sum(Credits).
     """
     accounts = db.query(LedgerAccount).filter(LedgerAccount.organiser_id == organiser.id).all()
@@ -140,7 +144,6 @@ def get_trial_balance(
     total_credits = Decimal('0.00')
 
     for acc in accounts:
-        # Sum debits and credits for this account
         debit_sum = db.query(func.coalesce(func.sum(JournalEntryLineRecord.debit_amount), 0)).filter(
             JournalEntryLineRecord.account_id == acc.id
         ).scalar()
@@ -178,8 +181,10 @@ def get_trial_balance(
 @router.get("/journal-entries", response_model=List[JournalEntryResponse])
 def list_journal_entries(
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
 ):
+    """List double-entry journal entries for caller's tenant organisation."""
     entries = db.query(JournalEntryRecord).filter(
         JournalEntryRecord.organiser_id == organiser.id
     ).order_by(JournalEntryRecord.created_at.desc()).all()

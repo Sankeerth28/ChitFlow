@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import timedelta, date, datetime
+from datetime import datetime, date
 from decimal import Decimal
 
 from app.db.session import get_db
-from app.api.deps import get_current_organiser
-from app.models.entities import Organiser, ChitScheme, SchemeMember, Member, Auction, LedgerAccount
+from app.api.deps import (
+    get_current_user,
+    get_current_active_organiser,
+    require_role,
+)
+from app.models.entities import User, Organiser, ChitScheme, SchemeMember, Member, Auction, Instalment, LedgerAccount
 from app.schemas.scheme import (
     ChitSchemeCreate,
     ChitSchemeResponse,
@@ -14,11 +18,6 @@ from app.schemas.scheme import (
     SchemeMemberResponse,
 )
 from app.core.calc_engine import ChitSchemeConfig, CalculationValidationError, StatutoryComplianceError
-from app.core.ledger_engine import (
-    COA_COLLECTION_POOL,
-    COA_PRIZE_PAYABLE,
-    COA_MEMBER_RECEIVABLE,
-)
 
 router = APIRouter(prefix="/schemes", tags=["Chit Schemes"])
 
@@ -27,9 +26,10 @@ router = APIRouter(prefix="/schemes", tags=["Chit Schemes"])
 def create_scheme(
     payload: ChitSchemeCreate,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["organiser"])),
 ):
-    # Validate via Deterministic Calculation Engine
+    """Create a new chit scheme. Restricted strictly to Organisers."""
     try:
         ChitSchemeConfig(
             chit_value=payload.chit_value,
@@ -42,7 +42,6 @@ def create_scheme(
     except (CalculationValidationError, StatutoryComplianceError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    # Check for duplicate scheme code
     existing = db.query(ChitScheme).filter(
         ChitScheme.organiser_id == organiser.id,
         ChitScheme.scheme_code == payload.scheme_code,
@@ -50,7 +49,7 @@ def create_scheme(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Scheme with code '{payload.scheme_code}' already exists.",
+            detail=f"Scheme with code '{payload.scheme_code}' already exists under your organisation.",
         )
 
     scheme = ChitScheme(
@@ -97,23 +96,52 @@ def create_scheme(
 @router.get("", response_model=List[ChitSchemeResponse])
 def list_schemes(
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    return db.query(ChitScheme).filter(ChitScheme.organiser_id == organiser.id).all()
+    """
+    List chit schemes.
+    - If Organiser/Accountant: returns all schemes owned by their tenant.
+    - If Member: returns ONLY schemes where the member is enrolled.
+    """
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role == "super_admin" and not current_user.organiser_id:
+            return db.query(ChitScheme).all()
+        return db.query(ChitScheme).filter(ChitScheme.organiser_id == current_user.organiser_id).all()
+
+    # Member role: filter by enrollment
+    if not current_user.member_profile:
+        return []
+
+    return db.query(ChitScheme).join(SchemeMember).filter(
+        SchemeMember.member_id == current_user.member_profile.id
+    ).all()
 
 
 @router.get("/{scheme_id}", response_model=ChitSchemeResponse)
 def get_scheme(
     scheme_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    scheme = db.query(ChitScheme).filter(
-        ChitScheme.id == scheme_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    """Retrieve single scheme with tenant isolation check."""
+    scheme = db.query(ChitScheme).filter(ChitScheme.id == scheme_id).first()
     if not scheme:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found.")
+
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        # Member role
+        if not current_user.member_profile:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+        enrolled = db.query(SchemeMember).filter(
+            SchemeMember.scheme_id == scheme.id,
+            SchemeMember.member_id == current_user.member_profile.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Not enrolled in this scheme.")
+
     return scheme
 
 
@@ -122,14 +150,16 @@ def enroll_member(
     scheme_id: str,
     payload: SchemeMemberEnroll,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
 ):
+    """Enrol a member to a ticket. Scoped to caller's organiser."""
     scheme = db.query(ChitScheme).filter(
         ChitScheme.id == scheme_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not scheme:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found under your organisation.")
 
     if scheme.rules_locked:
         raise HTTPException(
@@ -137,13 +167,13 @@ def enroll_member(
             detail="Cannot enroll members: Scheme rules are locked and active.",
         )
 
-    # Verify member exists
+    # Verify member belongs to same organiser
     member = db.query(Member).filter(
         Member.id == payload.member_id,
         Member.organiser_id == organiser.id,
     ).first()
     if not member:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found in your organisation.")
 
     # Check ticket range
     if payload.chit_ticket_number < 1 or payload.chit_ticket_number > scheme.total_members:
@@ -163,7 +193,7 @@ def enroll_member(
             detail=f"Ticket #{payload.chit_ticket_number} is already allocated in this scheme.",
         )
 
-    # Check member duplicate enrollment in same scheme
+    # Check duplicate member enrollment
     existing_member_enrollment = db.query(SchemeMember).filter(
         SchemeMember.scheme_id == scheme.id,
         SchemeMember.member_id == member.id,
@@ -191,14 +221,23 @@ def enroll_member(
 def list_scheme_members(
     scheme_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    current_user: User = Depends(get_current_user),
 ):
-    scheme = db.query(ChitScheme).filter(
-        ChitScheme.id == scheme_id,
-        ChitScheme.organiser_id == organiser.id,
-    ).first()
+    scheme = db.query(ChitScheme).filter(ChitScheme.id == scheme_id).first()
     if not scheme:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found.")
+
+    if current_user.role in ["super_admin", "organiser", "accountant"]:
+        if current_user.role != "super_admin" and scheme.organiser_id != current_user.organiser_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    else:
+        # Member can view tickets list of scheme they belong to
+        enrolled = db.query(SchemeMember).filter(
+            SchemeMember.scheme_id == scheme.id,
+            SchemeMember.member_id == current_user.member_profile.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return db.query(SchemeMember).filter(SchemeMember.scheme_id == scheme.id).order_by(SchemeMember.chit_ticket_number).all()
 
@@ -207,18 +246,20 @@ def list_scheme_members(
 def activate_scheme(
     scheme_id: str,
     db: Session = Depends(get_db),
-    organiser: Organiser = Depends(get_current_organiser),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["organiser"])),
 ):
     """
-    Activate scheme and generate scheduled auction dates for all N months.
-    Locks scheme parameters permanently.
+    Activate scheme and lock parameters permanently.
+    - Pre-generates all N monthly auctions.
+    - Automatically generates Month 1 subscription dues (Instalments) for all members (Fixes BUG-003).
     """
     scheme = db.query(ChitScheme).filter(
         ChitScheme.id == scheme_id,
         ChitScheme.organiser_id == organiser.id,
     ).first()
     if not scheme:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheme not found under your organisation.")
 
     if scheme.status == "active":
         return scheme
@@ -234,12 +275,10 @@ def activate_scheme(
     scheme.status = "active"
     scheme.rules_locked = True
 
-    # Pre-generate auctions if not already created
-    existing_auctions_count = db.query(Auction).filter(Auction.scheme_id == scheme.id).count()
-    if existing_auctions_count == 0:
+    # 1. Pre-generate auctions if not already created
+    existing_auctions = db.query(Auction).filter(Auction.scheme_id == scheme.id).order_by(Auction.auction_number).all()
+    if not existing_auctions:
         for m in range(1, scheme.duration_months + 1):
-            # Calculate approximate monthly auction date
-            # month m scheduled date:
             start = scheme.start_date
             year = start.year + (start.month + m - 2) // 12
             month = (start.month + m - 2) % 12 + 1
@@ -253,6 +292,34 @@ def activate_scheme(
                 status="scheduled",
             )
             db.add(auction)
+        db.flush()
+        existing_auctions = db.query(Auction).filter(Auction.scheme_id == scheme.id).order_by(Auction.auction_number).all()
+
+    # 2. Fix BUG-003: Generate Month 1 Instalment Dues for ALL members
+    auction_1 = existing_auctions[0]
+    all_members = db.query(SchemeMember).filter(SchemeMember.scheme_id == scheme.id).all()
+
+    due_day = min(scheme.monthly_due_day, 28)
+    m1_due_date = date(scheme.start_date.year, scheme.start_date.month, due_day)
+
+    for sm in all_members:
+        existing_inst = db.query(Instalment).filter(
+            Instalment.scheme_member_id == sm.id,
+            Instalment.instalment_number == 1,
+        ).first()
+        if not existing_inst:
+            inst = Instalment(
+                scheme_member_id=sm.id,
+                auction_id=auction_1.id,
+                instalment_number=1,
+                due_date=m1_due_date,
+                gross_subscription=scheme.monthly_subscription,
+                dividend_credit=Decimal('0.00'),
+                net_amount_due=scheme.monthly_subscription,
+                amount_paid=Decimal('0.00'),
+                status="pending",
+            )
+            db.add(inst)
 
     db.commit()
     db.refresh(scheme)

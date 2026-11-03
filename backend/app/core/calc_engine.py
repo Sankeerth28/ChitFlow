@@ -411,3 +411,4 @@ def generate_auction_journal_entry(
         )
 
     return entry
+

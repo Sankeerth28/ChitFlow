@@ -45,3 +45,4 @@ class MemberDashboardSummary(BaseModel):
     next_payment_date: Optional[date] = None
     next_due_amount: Decimal = Decimal('0.00')
     has_prized_any: bool = False
+

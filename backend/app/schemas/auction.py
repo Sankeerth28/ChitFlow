@@ -79,3 +79,4 @@ class AuctionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+

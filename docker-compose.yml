@@ -1,0 +1,69 @@
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: chitflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chitflow_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-chitflow_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeThisStrongProdPassword2026!}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chitflow_admin} -d ${POSTGRES_DB:-chitflow_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chitflow_network
+
+  # ----------------------------------------------------------------------------
+  # ChitFlow FastAPI Backend API Service
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chitflow_backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-chitflow_admin}:${POSTGRES_PASSWORD:-ChangeThisStrongProdPassword2026!}@db:5432/${POSTGRES_DB:-chitflow_prod}
+      SECRET_KEY: ${SECRET_KEY:?Error: SECRET_KEY environment variable is required}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      ALLOW_DEMO_SEEDING: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - chitflow_network
+
+  # ----------------------------------------------------------------------------
+  # ChitFlow React Frontend Web Service (Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+    container_name: chitflow_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - chitflow_network
+
+networks:
+  chitflow_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
