@@ -6,7 +6,7 @@ services:
     name: chitflow-api
     runtime: python
     region: oregon
-    plan: starter
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn -c gunicorn_conf.py app.main:app
@@ -28,12 +28,11 @@ services:
         value: https://chitflow-web.onrender.com,http://localhost:5173
 
   # ----------------------------------------------------------------------------
-  # Frontend Web Client (React + Vite)
+  # Frontend Web Client (React + Vite) - Served via Global CDN (No Region)
   # ----------------------------------------------------------------------------
   - type: web
     name: chitflow-web
     runtime: static
-    region: oregon
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
@@ -51,6 +50,7 @@ databases:
   # ----------------------------------------------------------------------------
   - name: chitflow-db
     region: oregon
-    plan: starter
+    plan: free
     databaseName: chitflow_prod
     user: chitflow_admin
+
