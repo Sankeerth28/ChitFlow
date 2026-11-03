@@ -325,3 +325,4 @@ ChitFlow/
 
 This software and its custom deterministic calculation algorithms are proprietary and confidential.  
 © 2026 ChitFlow Technologies. All rights reserved.
+

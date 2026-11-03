@@ -44,7 +44,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://chitflow-api.onrender.com/api/v1
+        value: https://chitflow-api-weyi.onrender.com/api/v1
 
 databases:
   # ----------------------------------------------------------------------------

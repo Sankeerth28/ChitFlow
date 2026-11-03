@@ -3,7 +3,21 @@
  * Manages JWT tokens securely in sessionStorage (cleared upon tab close, avoiding permanent localStorage persistence).
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.includes('chitflow-api.onrender.com')) {
+    return envUrl.replace('chitflow-api.onrender.com', 'chitflow-api-weyi.onrender.com');
+  }
+  if (envUrl) {
+    return envUrl;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    return 'https://chitflow-api-weyi.onrender.com/api/v1';
+  }
+  return 'http://localhost:8000/api/v1';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface UserProfile {
   id: string;
@@ -40,26 +54,33 @@ export const authStorage = {
 };
 
 export async function loginUser(mobileNumber: string, password?: string, pin?: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      mobile_number: mobileNumber,
-      password: password || undefined,
-      pin: pin || undefined,
-    }),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mobile_number: mobileNumber,
+        password: password || undefined,
+        pin: pin || undefined,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Authentication failed. Please verify credentials.');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Authentication failed. Please verify credentials.');
+    }
+
+    const data: AuthResponse = await response.json();
+    authStorage.setToken(data.access_token);
+    return data;
+  } catch (err: any) {
+    if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message.includes('fetch'))) {
+      throw new Error(`Unable to connect to ChitFlow API (${API_BASE_URL}). If backend is waking up, please wait a few seconds and try again.`);
+    }
+    throw err;
   }
-
-  const data: AuthResponse = await response.json();
-  authStorage.setToken(data.access_token);
-  return data;
 }
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
