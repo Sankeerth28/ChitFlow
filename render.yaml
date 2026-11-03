@@ -12,6 +12,8 @@ services:
     startCommand: gunicorn -c gunicorn_conf.py app.main:app
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
