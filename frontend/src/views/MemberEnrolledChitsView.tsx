@@ -9,6 +9,11 @@ import { getMemberEnrolledChits } from '../api/members';
 import type { EnrolledSchemeItem } from '../api/members';
 import { useToast } from '../components/Toast';
 
+// Helper Component for Skeleton Loading
+const SkeletonValue = ({ width = '100%' }: { width?: string }) => (
+  <div className="skeleton" style={{ width, height: '24px', borderRadius: '4px' }} />
+);
+
 interface MemberEnrolledChitsViewProps {
   memberId: string;
 }
@@ -36,21 +41,21 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
   }, [memberId]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="flex flex-col gap-5">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="flex justify-between items-center" style={{ flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: 'var(--text)' }}>
+          <h1 className="text-bold" style={{ fontSize: '24px', margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
             My Enrolled Chit Schemes
           </h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '14px' }}>
+          <p className="text-sm text-secondary" style={{ margin: 0 }}>
             Comprehensive view of all your chit fund tickets, subscription schedules, and prize status.
           </p>
         </div>
 
         <button
           onClick={fetchChits}
-          className="btn btn-secondary"
+          className="btn btn-secondary btn-interactive"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           <RefreshCw size={16} className={loading ? 'spin' : ''} />
@@ -59,40 +64,40 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
       </div>
 
       {/* Summary KPI Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div className="card-kpi">
+          <div className="text-xs uppercase text-muted text-bold">
             Total Enrolled Tickets
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text)', marginTop: '4px' }}>
-            {loading ? '...' : chits.length}
+          <div className="text-bold" style={{ fontSize: '24px', color: 'var(--text-primary)', marginTop: '4px' }}>
+            {loading ? <SkeletonValue width="30%" /> : chits.length}
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--primary)' }}>
+          <div className="text-xs uppercase text-muted text-bold">
             Total Chit Value
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>
-            ₹{loading ? '...' : chits.reduce((acc, c) => acc + (c.chit_value || 0), 0).toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '24px', color: 'var(--primary)', marginTop: '4px' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.chit_value || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--success)' }}>
+          <div className="text-xs uppercase text-muted text-bold">
             Total Paid
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--success)', marginTop: '4px' }}>
-            ₹{loading ? '...' : chits.reduce((acc, c) => acc + (c.total_paid || 0), 0).toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '24px', color: 'var(--success)', marginTop: '4px' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.total_paid || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--secondary)' }}>
+          <div className="text-xs uppercase text-muted text-bold">
             Dividends Saved
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>
-            ₹{loading ? '...' : chits.reduce((acc, c) => acc + (c.total_dividend_earned || 0), 0).toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '24px', color: 'var(--secondary)', marginTop: '4px' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.total_dividend_earned || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
       </div>
@@ -116,18 +121,19 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px auto' }} />
-                    <div>Loading your enrolled chit schemes...</div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={9} style={{ padding: '20px', textAlign: 'center' }}>
+                      <SkeletonValue width="100%" />
+                    </td>
+                  </tr>
+                ))
               ) : chits.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={9} className="flex flex-col items-center justify-center" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <FileText size={32} style={{ margin: '0 auto 12px auto', opacity: 0.5 }} />
-                    <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>No Enrolled Schemes Found</div>
-                    <div>You are not currently allocated to any chit group. Contact your organiser to enrol.</div>
+                    <div className="text-bold" style={{ color: 'var(--text)', marginBottom: '4px' }}>No Enrolled Schemes Found</div>
+                    <div className="text-sm">You are not currently allocated to any chit group. Contact your organiser to enrol.</div>
                   </td>
                 </tr>
               ) : (
@@ -135,10 +141,20 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
                   const isExpanded = expandedSchemeId === c.scheme_id;
                   return (
                     <React.Fragment key={c.scheme_member_id}>
-                      <tr style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setExpandedSchemeId(isExpanded ? null : c.scheme_id)}>
+                      <tr
+                        className="btn-interactive"
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          transition: 'var(--transition-fast)',
+                        }}
+                        onClick={() => setExpandedSchemeId(isExpanded ? null : c.scheme_id)}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-alt)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
                         <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--text)' }}>{c.scheme_name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                          <div className="text-bold" style={{ color: 'var(--text-primary)' }}>{c.scheme_name}</div>
+                          <div className="text-xs text-muted" style={{ fontFamily: 'monospace' }}>
                             {c.scheme_code}
                           </div>
                         </td>
@@ -163,7 +179,7 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
                           ₹{(c.total_dividend_earned || 0).toLocaleString('en-IN')}
                         </td>
 
-                        <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--danger)', fontWeight: 700 }}>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--error)', fontWeight: 700 }}>
                           ₹{(c.balance_due || 0).toLocaleString('en-IN')}
                         </td>
 
@@ -179,7 +195,7 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
                               e.stopPropagation();
                               setExpandedSchemeId(isExpanded ? null : c.scheme_id);
                             }}
-                            className="btn btn-secondary"
+                            className="btn btn-secondary btn-interactive"
                             style={{ padding: '4px 8px' }}
                           >
                             {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -191,29 +207,29 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
                       {isExpanded && (
                         <tr style={{ backgroundColor: 'var(--surface-alt)' }}>
                           <td colSpan={9} style={{ padding: '16px 24px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-                              <div style={{ padding: '12px', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+                              <div className="card-kpi" style={{ padding: '12px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                                <div className="text-xs uppercase text-muted text-bold mb-2">
                                   Statutory Protections (Act of 1982)
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+                                <div className="text-xs text-secondary" style={{ lineHeight: '1.6' }}>
                                   • Section 21(1)(b): Foreman commission capped strictly at 5%.<br />
                                   • 2019 Amendment: Max auction discount capped at 30% (₹{(c.chit_value * 0.3).toLocaleString('en-IN')}).<br />
                                   • Section 20: 100% Fixed Deposit in Scheduled Bank before launch.
                                 </div>
                               </div>
 
-                              <div style={{ padding: '12px', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
+                              <div className="card-kpi" style={{ padding: '12px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                                <div className="text-xs uppercase text-muted text-bold mb-2">
                                   Auction Eligibility
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+                                <div className="text-xs text-secondary">
                                   {c.is_prized ? (
-                                    <div style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                    <div className="text-bold" style={{ color: 'var(--primary)', fontWeight: 600 }}>
                                       Prize disbursed in Month {c.prize_month}. You are now a non-bidding paying subscriber until chit maturity.
                                     </div>
                                   ) : (
-                                    <div style={{ color: 'var(--success)', fontWeight: 600 }}>
+                                    <div className="text-bold" style={{ color: 'var(--success)', fontWeight: 600 }}>
                                       Eligible to participate in monthly reverse auction bidding!
                                     </div>
                                   )}

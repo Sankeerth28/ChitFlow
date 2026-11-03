@@ -43,26 +43,25 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
+      className="flex items-center justify-center"
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(3px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'var(--glass-blur)',
         padding: '16px',
         zIndex: 2000,
+        transition: 'var(--transition-slow)',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="card"
+        className="card animate-fade-in"
         style={{
           width: '100%',
           maxWidth: computedMaxWidth,
@@ -71,33 +70,33 @@ export const Modal: React.FC<ModalProps> = ({
           flexDirection: 'column',
           padding: 0,
           overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
-          animation: 'fadeIn 0.15s ease-out',
+          boxShadow: 'var(--shadow-xl)',
+          transform: 'scale(1)',
+          transition: 'var(--transition-slow)',
         }}
       >
         {/* Header */}
         <div
+          className="flex items-center justify-between"
           style={{
             padding: '16px 20px',
             borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             backgroundColor: 'var(--surface-alt)',
           }}
         >
           <div>
-            <h2 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+            <h2 className="text-bold" style={{ fontSize: '17px', margin: 0, color: 'var(--text-primary)' }}>
               {title}
             </h2>
             {subtitle && (
-              <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <p className="text-xs text-secondary" style={{ margin: '2px 0 0 0' }}>
                 {subtitle}
               </p>
             )}
           </div>
           <button
             onClick={onClose}
+            className="btn-interactive"
             style={{
               background: 'none',
               border: 'none',

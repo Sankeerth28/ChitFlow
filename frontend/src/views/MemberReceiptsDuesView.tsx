@@ -12,6 +12,7 @@ import {
   getMemberReceipts,
   getMemberDues,
 } from '../api/members';
+import { submitPayment } from '../api/payments';
 import type {
   MemberPaymentReceipt,
   MemberDueDetail,
@@ -71,27 +72,15 @@ export const MemberReceiptsDuesView: React.FC<MemberReceiptsDuesViewProps> = ({ 
     if (!selectedDue) return;
     setSubmittingPayment(true);
     try {
-      // Create payment via backend API
-      const res = await fetch('/api/v1/payments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('chitflow_auth_token') || ''}`,
-        },
-        body: JSON.stringify({
-          scheme_id: selectedDue.scheme_id,
-          member_id: memberId,
-          instalment_number: selectedDue.instalment_number,
-          amount: selectedDue.net_due,
-          payment_mode: paymentMode,
-          transaction_ref: referenceId.trim() || `TXN-${Date.now()}`,
-        }),
+      // Submit payment via centralized API service
+      await submitPayment({
+        scheme_id: selectedDue.scheme_id,
+        member_id: memberId,
+        instalment_number: selectedDue.instalment_number,
+        amount: selectedDue.net_due,
+        payment_mode: paymentMode,
+        transaction_ref: referenceId.trim() || undefined,
       });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'Failed to submit payment slip');
-      }
 
       showToast('Payment submitted successfully! Marked for accountant verification.', 'success');
       setShowPayModal(false);

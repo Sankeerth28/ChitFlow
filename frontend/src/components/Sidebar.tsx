@@ -80,38 +80,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
+      className="flex flex-col"
       style={{
         width: '260px',
-        backgroundColor: '#0f172a',
+        backgroundColor: 'var(--primary)',
         color: '#f8fafc',
-        display: 'flex',
-        flexDirection: 'column',
         flexShrink: 0,
         height: '100vh',
         position: 'sticky',
         top: 0,
         borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: 'var(--shadow-lg)',
       }}
     >
       {/* Brand Header */}
       <div
+        className="flex items-center gap-3"
         style={{
           padding: '20px 20px 18px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
         }}
       >
         <div
+          className="flex items-center justify-center"
           style={{
             width: '38px',
             height: '38px',
             borderRadius: '8px',
-            backgroundColor: '#2563eb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            backgroundColor: 'var(--secondary)',
             color: '#ffffff',
             boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
           }}
@@ -119,10 +115,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Scale size={22} />
         </div>
         <div>
-          <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px' }}>
+          <div className="text-bold" style={{ fontSize: '16px', color: '#ffffff', letterSpacing: '-0.3px' }}>
             ChitFlow
           </div>
-          <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+          <div className="text-xs uppercase text-muted" style={{ letterSpacing: '0.5px', fontWeight: 600 }}>
             Statutory Engine
           </div>
         </div>
@@ -131,21 +127,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Role Pill */}
       <div style={{ padding: '16px 20px 8px' }}>
         <div
+          className="flex items-center justify-between"
           style={{
             padding: '8px 12px',
-            borderRadius: '6px',
+            borderRadius: 'var(--radius-sm)',
             backgroundColor: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
           }}
         >
           <div>
-            <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
+            <div className="text-xs uppercase text-muted" style={{ fontWeight: 600 }}>
               Access Scope
             </div>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
+            <div className="text-sm text-bold" style={{ color: '#38bdf8' }}>
               {roleLabels[role] || role.toUpperCase()}
             </div>
           </div>
@@ -163,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation Items */}
       <nav style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
-        <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', padding: '0 8px 8px', letterSpacing: '0.5px' }}>
+        <div className="text-xs uppercase text-muted text-bold" style={{ padding: '0 8px 8px', letterSpacing: '0.5px' }}>
           Menu
         </div>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -173,36 +167,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <li key={item.key}>
                 <button
                   onClick={() => onSelectTab(item.key)}
+                  className={`btn btn-interactive ${isActive ? 'text-bold' : ''}`}
                   style={{
                     width: '100%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: isActive ? '#2563eb' : 'transparent',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: isActive ? 'var(--secondary)' : 'transparent',
                     color: isActive ? '#ffffff' : '#cbd5e1',
                     fontSize: '13px',
-                    fontWeight: isActive ? 600 : 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
                     textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                      e.currentTarget.style.color = '#ffffff';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#cbd5e1';
-                    }
+                    transition: 'var(--transition-fast)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="flex items-center gap-2">
                     <span style={{ color: isActive ? '#ffffff' : '#94a3b8' }}>{item.icon}</span>
                     <span>{item.label}</span>
                   </div>
@@ -216,37 +196,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer */}
       <div
+        className="flex flex-col gap-2"
         style={{
           padding: '16px 20px',
           borderTop: '1px solid rgba(255, 255, 255, 0.08)',
           fontSize: '11px',
           color: '#64748b',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="flex items-center gap-2">
           <ShieldCheck size={14} style={{ color: '#10b981' }} />
           <span>Section 21 & 23 Certified</span>
         </div>
         {onLogout && (
           <button
             onClick={onLogout}
+            className="btn btn-interactive"
             style={{
               width: '100%',
               padding: '8px',
-              borderRadius: '6px',
+              borderRadius: 'var(--radius-sm)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backgroundColor: 'transparent',
               color: '#ef4444',
-              cursor: 'pointer',
               fontSize: '12px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              marginTop: '4px',
+              transition: 'var(--transition-fast)',
             }}
           >
             <LogOut size={13} />

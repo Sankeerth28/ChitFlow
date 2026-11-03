@@ -16,6 +16,11 @@ import { getMemberEnrolledChits, getMemberDues } from '../api/members';
 import type { EnrolledSchemeItem, MemberDueDetail } from '../api/members';
 import { useToast } from '../components/Toast';
 
+// Helper Component for Skeleton Loading
+const SkeletonValue = ({ width = '100%' }: { width?: string }) => (
+  <div className="skeleton" style={{ width, height: '24px', borderRadius: '4px' }} />
+);
+
 interface MemberDashboardViewProps {
   memberId: string;
   onNavigateTab: (tab: string) => void;
@@ -59,44 +64,55 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
   const totalNetDue = dues.reduce((acc, d) => acc + (d.net_due || 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Top Welcome Banner */}
+    <div className="flex flex-col gap-5">
+      {/* Top Welcome Banner - Glassmorphic */}
       <div
-        className="card"
+        className="card card-glass animate-fade-in"
         style={{
-          background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%)',
           color: '#ffffff',
-          padding: '24px',
-          border: 'none',
+          padding: '32px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="flex justify-between items-center" style={{ flexWrap: 'wrap', gap: '20px' }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '12px', backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
+            <div
+              className="flex items-center gap-2"
+              style={{
+                padding: '4px 12px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '12px',
+                width: 'fit-content'
+              }}
+            >
               <ShieldCheck size={14} />
               Chit Funds Act, 1982 Compliant
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 6px 0', color: '#ffffff' }}>
-              My 10-Second Financial Dashboard
+            <h1 className="text-bold" style={{ fontSize: '28px', margin: '0 0 8px 0', color: '#ffffff' }}>
+              Financial Command Center
             </h1>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+            <p className="text-muted" style={{ margin: 0, fontSize: '15px' }}>
               Instant real-time visibility into your subscriptions, auction dividends, and ledger balance.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="flex gap-3">
             <button
               onClick={() => onNavigateTab('receipts')}
-              className="btn"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', gap: '8px' }}
+              className="btn btn-interactive"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)' }}
             >
               <Receipt size={16} />
-              My Receipts & Dues
+              Receipts & Dues
             </button>
             <button
               onClick={() => onNavigateTab('chits')}
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              className="btn btn-primary btn-interactive"
             >
               <FileText size={16} />
               Enrolled Schemes
@@ -106,106 +122,108 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
       </div>
 
       {/* 4 Instant KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         {/* Card 1: Total Paid */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--success)' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs uppercase text-muted text-bold">
               Total Paid So Far
             </span>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)' }}>
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(22, 163, 74, 0.1)', color: 'var(--success)' }}>
               <Wallet size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text)' }}>
-            ₹{loading ? '...' : totalPaid.toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '26px', color: 'var(--text-primary)' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${totalPaid.toLocaleString('en-IN')}`}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          <div className="text-xs text-muted" style={{ marginTop: '4px' }}>
             Verified double-entry subscription payments
           </div>
         </div>
 
         {/* Card 2: Dividends Earned */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--secondary)' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs uppercase text-muted text-bold">
               Dividends Earned
             </span>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)' }}>
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(37, 99, 235, 0.1)', color: 'var(--secondary)' }}>
               <TrendingUp size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--primary)' }}>
-            ₹{loading ? '...' : totalDividend.toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '26px', color: 'var(--secondary)' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${totalDividend.toLocaleString('en-IN')}`}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          <div className="text-xs text-muted" style={{ marginTop: '4px' }}>
             Distributed monthly auction dividend savings
           </div>
         </div>
 
         {/* Card 3: Net Outstanding Dues */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: `4px solid ${totalNetDue > 0 ? 'var(--error)' : 'var(--success)'}` }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs uppercase text-muted text-bold">
               Net Dues Payable
             </span>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: totalNetDue > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: totalNetDue > 0 ? 'var(--danger)' : 'var(--success)' }}>
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: totalNetDue > 0 ? 'rgba(220, 38, 38, 0.1)' : 'rgba(22, 163, 74, 0.1)', color: totalNetDue > 0 ? 'var(--error)' : 'var(--success)' }}>
               {totalNetDue > 0 ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: totalNetDue > 0 ? 'var(--danger)' : 'var(--success)' }}>
-            ₹{loading ? '...' : totalNetDue.toLocaleString('en-IN')}
+          <div className="text-bold" style={{ fontSize: '26px', color: totalNetDue > 0 ? 'var(--error)' : 'var(--success)' }}>
+            {loading ? <SkeletonValue width="60%" /> : `₹${totalNetDue.toLocaleString('en-IN')}`}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          <div className="text-xs text-muted" style={{ marginTop: '4px' }}>
             {totalNetDue > 0 ? 'After deducting monthly dividend' : 'All subscriptions up to date!'}
           </div>
         </div>
 
         {/* Card 4: Enrolled Schemes */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="card-kpi" style={{ borderTop: '4px solid var(--warning)' }}>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs uppercase text-muted text-bold">
               Active Chits
             </span>
-            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)' }}>
+            <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(217, 119, 6, 0.1)', color: 'var(--warning)' }}>
               <Calendar size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text)' }}>
-            {loading ? '...' : enrolledChits.length}
+          <div className="text-bold" style={{ fontSize: '26px', color: 'var(--text-primary)' }}>
+            {loading ? <SkeletonValue width="30%" /> : enrolledChits.length}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            {enrolledChits.filter(c => c.is_prized).length} prized, {enrolledChits.filter(c => !c.is_prized).length} active bidder
+          <div className="text-xs text-muted" style={{ marginTop: '4px' }}>
+            {loading ? <SkeletonValue width="80%" /> : `${enrolledChits.filter(c => c.is_prized).length} prized, ${enrolledChits.filter(c => !c.is_prized).length} active bidder`}
           </div>
         </div>
       </div>
 
       {/* Statutory Formula Explanation Card */}
       <div
-        className="card"
+        className="card animate-slide-down"
         style={{
           backgroundColor: 'var(--surface-alt)',
           borderLeft: '4px solid var(--primary)',
-          padding: '16px 20px',
+          padding: '20px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--primary)', fontWeight: 700, fontSize: '14px' }}>
+        <div className="flex items-center gap-2 mb-2 text-bold" style={{ color: 'var(--primary)', fontSize: '14px' }}>
           <Info size={16} />
           <span>Statutory Monthly Contribution Formula (Section 21, Chit Funds Act, 1982)</span>
         </div>
-        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+        <p className="text-sm text-secondary mb-3" style={{ lineHeight: 1.6 }}>
           Your monthly payable is not the full subscription value. You receive an immediate deduction for the auction dividend:
         </p>
         <div
           style={{
             fontFamily: 'monospace',
             backgroundColor: 'var(--surface)',
-            padding: '10px 14px',
-            borderRadius: '6px',
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-sm)',
             border: '1px solid var(--border)',
             fontWeight: 700,
             fontSize: '13px',
             display: 'inline-block',
+            boxShadow: 'var(--shadow-inner)',
+            color: 'var(--text-primary)'
           }}
         >
           Net Payable Due = Gross Monthly Subscription − Distributed Auction Dividend
@@ -213,48 +231,49 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
       </div>
 
       {/* Two Columns: Active Schemes & Upcoming Dues */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
         {/* Left Column: My Enrolled Chits Summary */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-bold" style={{ fontSize: '16px', margin: 0, color: 'var(--text-primary)' }}>
               My Enrolled Chits
             </h3>
             <button
               onClick={() => onNavigateTab('chits')}
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+              className="btn-interactive text-sm text-bold"
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               View Full Details <ArrowRight size={13} />
             </button>
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-              <RefreshCw size={20} className="spin" style={{ margin: '0 auto 8px auto' }} />
-              <div>Loading chits...</div>
+            <div className="flex flex-col items-center justify-center" style={{ padding: '30px', color: 'var(--text-secondary)' }}>
+              <RefreshCw size={20} className="spin" style={{ margin: '0 auto 12px auto' }} />
+              <div className="text-sm">Loading your schemes...</div>
             </div>
           ) : enrolledChits.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+            <div className="flex flex-col items-center justify-center" style={{ padding: '40px', color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center' }}>
               You are not currently enrolled in any chit scheme.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex flex-col gap-3">
               {enrolledChits.map((c) => (
                 <div
                   key={c.scheme_member_id}
+                  className="card-kpi"
                   style={{
                     padding: '14px',
-                    borderRadius: '8px',
                     backgroundColor: 'var(--surface-alt)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <div className="flex justify-between items-start mb-2">
                     <div>
-                      <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '14px' }}>
+                      <div className="text-bold" style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
                         {c.scheme_name}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <div className="text-xs text-muted">
                         Scheme: {c.scheme_code} | Ticket: #{c.ticket_number}
                       </div>
                     </div>
@@ -263,18 +282,18 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
                     </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                  <div className="grid gap-2 text-xs" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
                     <div>
-                      <span style={{ color: 'var(--text-secondary)' }}>Chit Value:</span>
-                      <div style={{ fontWeight: 600 }}>₹{c.chit_value.toLocaleString('en-IN')}</div>
+                      <span className="text-muted">Chit Value:</span>
+                      <div className="text-bold">₹{c.chit_value.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--text-secondary)' }}>Total Paid:</span>
-                      <div style={{ fontWeight: 600, color: 'var(--success)' }}>₹{c.total_paid.toLocaleString('en-IN')}</div>
+                      <span className="text-muted">Total Paid:</span>
+                      <div className="text-bold" style={{ color: 'var(--success)' }}>₹{c.total_paid.toLocaleString('en-IN')}</div>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--text-secondary)' }}>Balance Due:</span>
-                      <div style={{ fontWeight: 600, color: 'var(--danger)' }}>₹{(c.balance_due || 0).toLocaleString('en-IN')}</div>
+                      <span className="text-muted">Balance Due:</span>
+                      <div className="text-bold" style={{ color: 'var(--error)' }}>₹{(c.balance_due || 0).toLocaleString('en-IN')}</div>
                     </div>
                   </div>
                 </div>
@@ -285,64 +304,65 @@ export const MemberDashboardView: React.FC<MemberDashboardViewProps> = ({ member
 
         {/* Right Column: Pending Dues & Pay Now */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-bold" style={{ fontSize: '16px', margin: 0, color: 'var(--text-primary)' }}>
               Outstanding Subscription Dues
             </h3>
             <button
               onClick={() => onNavigateTab('receipts')}
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+              className="btn-interactive text-sm text-bold"
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               View Receipts <ArrowRight size={13} />
             </button>
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-              <RefreshCw size={20} className="spin" style={{ margin: '0 auto 8px auto' }} />
-              <div>Loading dues...</div>
+            <div className="flex flex-col items-center justify-center" style={{ padding: '30px', color: 'var(--text-secondary)' }}>
+              <RefreshCw size={20} className="spin" style={{ margin: '0 auto 12px auto' }} />
+              <div className="text-sm">Loading your dues...</div>
             </div>
           ) : dues.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--success)', fontSize: '13px' }}>
-              <CheckCircle2 size={32} style={{ margin: '0 auto 10px auto' }} />
-              <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>All Subscriptions Clear!</div>
-              <div>There are no outstanding dues on your account at this time.</div>
+            <div className="flex flex-col items-center justify-center" style={{ padding: '40px', color: 'var(--success)', fontSize: '13px', textAlign: 'center' }}>
+              <CheckCircle2 size={32} style={{ margin: '0 auto 12px auto' }} />
+              <div className="text-bold" style={{ fontSize: '15px', marginBottom: '4px' }}>All Subscriptions Clear!</div>
+              <div className="text-muted">There are no outstanding dues on your account at this time.</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex flex-col gap-3">
               {dues.map((d, idx) => (
                 <div
                   key={idx}
+                  className="card-kpi"
                   style={{
                     padding: '14px',
-                    borderRadius: '8px',
                     backgroundColor: 'var(--surface-alt)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="flex justify-between items-center mb-2">
                     <div>
-                      <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: '13px' }}>
+                      <span className="text-bold" style={{ color: 'var(--text-primary)', fontSize: '13px' }}>
                         {d.scheme_name}
                       </span>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <div className="text-xs text-muted">
                         Instalment #{d.instalment_number} | Due Date: {d.due_date ? new Date(d.due_date).toLocaleDateString('en-IN') : 'Immediate'}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--danger)' }}>
+                      <div className="text-bold" style={{ fontSize: '16px', color: 'var(--error)' }}>
                         ₹{d.net_due.toLocaleString('en-IN')}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                      <div className="text-xs text-muted">
                         Gross: ₹{d.gross_subscription.toLocaleString('en-IN')} | Div: ₹{d.dividend_amount.toLocaleString('en-IN')}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <div className="flex justify-end mt-2">
                     <button
                       onClick={() => onNavigateTab('receipts')}
-                      className="btn btn-primary"
+                      className="btn btn-primary btn-interactive"
                       style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <Receipt size={13} />

@@ -43,7 +43,6 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={{ showToast, success, error, warning, info }}>
       {children}
-      {/* Toast container floating top-right */}
       <div
         style={{
           position: 'fixed',
@@ -95,14 +94,16 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 fontSize: '13px',
                 fontWeight: 500,
                 color: 'var(--text-primary)',
+                transition: 'var(--transition-fast)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+              <div className="flex items-center gap-3" style={{ flex: 1 }}>
                 {icon}
-                <span>{toast.message}</span>
+                <span className="text-sm">{toast.message}</span>
               </div>
               <button
                 onClick={() => removeToast(toast.id)}
+                className="btn-interactive"
                 style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
                 aria-label="Close notification"
               >
@@ -123,4 +124,3 @@ export function useToast(): ToastContextValue {
   }
   return ctx;
 }
-
