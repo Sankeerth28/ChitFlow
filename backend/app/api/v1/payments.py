@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 import uuid
@@ -33,6 +33,67 @@ from app.schemas.payment import (
 from app.core.ledger_engine import LedgerEngine, PaymentMethod
 
 router = APIRouter(prefix="/payments", tags=["Payments & Receipts"])
+
+
+@router.get("", response_model=List[PaymentReceiptResponse])
+def list_payments(
+    status_filter: Optional[str] = None,
+    scheme_id: Optional[str] = None,
+    member_id: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    organiser: Organiser = Depends(get_current_active_organiser),
+    current_user: User = Depends(require_role(["super_admin", "organiser", "accountant"])),
+):
+    """
+    List all payments for the caller's organisation with optional status, scheme, and member filters.
+    Used by Organisers and Accountants for collections management and reconciliation.
+    """
+    query = (
+        db.query(Payment)
+        .join(Instalment, Payment.instalment_id == Instalment.id)
+        .join(SchemeMember, Instalment.scheme_member_id == SchemeMember.id)
+        .join(ChitScheme, SchemeMember.scheme_id == ChitScheme.id)
+        .join(Member, Payment.member_id == Member.id)
+        .filter(ChitScheme.organiser_id == organiser.id)
+    )
+
+    if status_filter:
+        query = query.filter(Payment.status == status_filter.strip().lower())
+    if scheme_id:
+        query = query.filter(ChitScheme.id == scheme_id)
+    if member_id:
+        query = query.filter(Member.id == member_id)
+
+    payments = query.order_by(Payment.payment_date.desc(), Payment.created_at.desc()).limit(limit).all()
+
+    results = []
+    for p in payments:
+        inst = p.instalment
+        sm = inst.scheme_member if inst else None
+        sch = sm.scheme if sm else None
+        mem = sm.member if sm else None
+
+        results.append(
+            PaymentReceiptResponse(
+                receipt_number=p.receipt_number,
+                scheme_name=sch.scheme_name if sch else "Chit Scheme",
+                scheme_code=sch.scheme_code if sch else "CHIT",
+                instalment_number=inst.instalment_number if inst else 1,
+                member_name=mem.full_name if mem else "Subscriber",
+                member_code=mem.member_code if mem else "MEM",
+                gross_subscription=inst.gross_subscription if inst else Decimal('0.00'),
+                dividend_credit=inst.dividend_credit if inst else Decimal('0.00'),
+                net_amount_due=inst.net_amount_due if inst else Decimal('0.00'),
+                amount_received=p.amount_received,
+                payment_method=p.payment_method,
+                payment_reference_no=p.payment_reference_no,
+                payment_date=p.payment_date,
+                verification_status=p.status,
+                created_at=p.created_at,
+            )
+        )
+    return results
 
 
 @router.get("/instalments/member/{member_id}", response_model=List[InstalmentResponse])

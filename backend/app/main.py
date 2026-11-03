@@ -31,6 +31,22 @@ async def lifespan(app: FastAPI):
     for attempt in range(1, 11):
         try:
             Base.metadata.create_all(bind=engine)
+            # Safe schema migration for newly added columns
+            try:
+                from sqlalchemy import inspect, text
+                with engine.connect() as conn:
+                    inspector = inspect(conn)
+                    if "members" in inspector.get_table_names():
+                        cols = [c["name"] for c in inspector.get_columns("members")]
+                        if "email" not in cols:
+                            conn.execute(text("ALTER TABLE members ADD COLUMN email VARCHAR(255)"))
+                        if "status" not in cols:
+                            conn.execute(text("ALTER TABLE members ADD COLUMN status VARCHAR(30) DEFAULT 'active'"))
+                        if "updated_at" not in cols:
+                            conn.execute(text("ALTER TABLE members ADD COLUMN updated_at TIMESTAMP"))
+                        conn.commit()
+            except Exception:
+                pass
             break
         except Exception as e:
             if attempt == 10:
