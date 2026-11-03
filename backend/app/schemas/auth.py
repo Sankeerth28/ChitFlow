@@ -1,9 +1,10 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+from app.schemas.base import APIModel
 from typing import Optional
 from datetime import datetime
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(APIModel):
     mobile_number: str = Field(..., pattern=r"^[6-9]\d{9}$", example="9849012345")
     password: Optional[str] = Field(None, min_length=6, max_length=72, example="OrganiserPassword123!")
     pin: Optional[str] = Field(None, min_length=4, max_length=6, example="1234")
@@ -16,7 +17,7 @@ class LoginRequest(BaseModel):
         return v
 
 
-class RegisterRequest(BaseModel):
+class RegisterRequest(APIModel):
     mobile_number: str = Field(..., pattern=r"^[6-9]\d{9}$", example="9876543299")
     password: str = Field(..., min_length=6, max_length=72, example="SecurePassword123!")
     full_name: str = Field(..., min_length=2, max_length=255, example="K. Venkat Rao")
@@ -32,7 +33,7 @@ class RegisterRequest(BaseModel):
         return v
 
 
-class UserResponse(BaseModel):
+class UserResponse(APIModel):
     id: str
     mobile_number: str
     role: str
@@ -48,18 +49,18 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(APIModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
 
 
-class AccountRecoveryRequest(BaseModel):
+class AccountRecoveryRequest(APIModel):
     mobile_number: str = Field(..., pattern=r"^[6-9]\d{9}$", example="9849012345")
 
 
-class AccountRecoveryResponse(BaseModel):
+class AccountRecoveryResponse(APIModel):
     status: str
     message: str
     otp_provider_status: str = "unconfigured"

@@ -79,7 +79,7 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
             Total Chit Value
           </div>
           <div className="text-bold" style={{ fontSize: '24px', color: 'var(--primary)', marginTop: '4px' }}>
-            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.chit_value || 0), 0).toLocaleString('en-IN')}`}
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + Number(c.chit_value || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
 
@@ -88,7 +88,7 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
             Total Paid
           </div>
           <div className="text-bold" style={{ fontSize: '24px', color: 'var(--success)', marginTop: '4px' }}>
-            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.total_paid || 0), 0).toLocaleString('en-IN')}`}
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + Number(c.total_paid || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export const MemberEnrolledChitsView: React.FC<MemberEnrolledChitsViewProps> = (
             Dividends Saved
           </div>
           <div className="text-bold" style={{ fontSize: '24px', color: 'var(--secondary)', marginTop: '4px' }}>
-            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + (c.total_dividend_earned || 0), 0).toLocaleString('en-IN')}`}
+            {loading ? <SkeletonValue width="60%" /> : `₹${chits.reduce((acc, c) => acc + Number(c.total_dividend_earned || 0), 0).toLocaleString('en-IN')}`}
           </div>
         </div>
       </div>

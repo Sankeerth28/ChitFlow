@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 from decimal import Decimal
+from app.schemas.base import APIModel
 from typing import Optional
 from datetime import date, datetime
 from enum import Enum
@@ -14,7 +15,7 @@ class SchemeStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ChitSchemeBase(BaseModel):
+class ChitSchemeBase(APIModel):
     scheme_code: str = Field(..., min_length=2, max_length=50, example="CHIT-10M-1L")
     scheme_name: str = Field(..., min_length=3, max_length=255, example="1 Lakh 10 Months Festive Chit")
     chit_value: Decimal = Field(..., gt=0, example=Decimal('100000.00'))
@@ -48,7 +49,7 @@ class ChitSchemeCreate(ChitSchemeBase):
     pass
 
 
-class ChitSchemeUpdate(BaseModel):
+class ChitSchemeUpdate(APIModel):
     scheme_name: Optional[str] = None
     pso_number: Optional[str] = None
     fd_receipt_number: Optional[str] = None
@@ -67,13 +68,13 @@ class ChitSchemeResponse(ChitSchemeBase):
         from_attributes = True
 
 
-class SchemeMemberEnroll(BaseModel):
+class SchemeMemberEnroll(APIModel):
     member_id: str
     chit_ticket_number: int = Field(..., gt=0)
     enrollment_date: date = Field(default_factory=date.today)
 
 
-class SchemeMemberResponse(BaseModel):
+class SchemeMemberResponse(APIModel):
     id: str
     scheme_id: str
     member_id: str

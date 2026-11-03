@@ -14,6 +14,9 @@ import sys
 import os
 from datetime import date
 
+# Never let the test suite drop/recreate the development database.
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_chitflow.db")
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.core.ledger_engine import (

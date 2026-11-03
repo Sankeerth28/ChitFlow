@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
 from decimal import Decimal
+from app.schemas.base import APIModel
 from typing import Optional
 from datetime import date, datetime
 from enum import Enum
@@ -24,7 +25,7 @@ class PaymentMethodEnum(str, Enum):
     DD = "dd"
 
 
-class PaymentSubmit(BaseModel):
+class PaymentSubmit(APIModel):
     instalment_id: str
     amount_received: Decimal = Field(..., gt=0, example=Decimal('7800.00'))
     payment_method: PaymentMethodEnum = Field(default=PaymentMethodEnum.UPI)
@@ -33,12 +34,23 @@ class PaymentSubmit(BaseModel):
     proof_document_url: Optional[str] = None
 
 
-class PaymentVerifyRequest(BaseModel):
+class PaymentVerifyRequest(APIModel):
     status: PaymentStatus = Field(default=PaymentStatus.PAID)
     verification_notes: Optional[str] = Field(None, example="Verified against HDFC Bank account credit on 2026-11-05.")
 
 
-class PaymentReceiptResponse(BaseModel):
+class PaymentRecordRequest(APIModel):
+    """Counter collection or member-submitted payment slip."""
+    scheme_id: str
+    member_id: str
+    instalment_number: int = Field(default=1, ge=1)
+    amount: Decimal = Field(..., gt=0, example=Decimal('10000.00'))
+    payment_mode: str = Field(default="cash")
+    transaction_ref: Optional[str] = None
+
+
+class PaymentReceiptResponse(APIModel):
+    payment_id: str
     receipt_number: str
     scheme_name: str
     scheme_code: str
@@ -57,7 +69,7 @@ class PaymentReceiptResponse(BaseModel):
     created_at: datetime
 
 
-class InstalmentResponse(BaseModel):
+class InstalmentResponse(APIModel):
     id: str
     scheme_member_id: str
     auction_id: str

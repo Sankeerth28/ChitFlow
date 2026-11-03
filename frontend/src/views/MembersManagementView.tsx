@@ -279,7 +279,7 @@ export const MembersManagementView: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
           <button
             onClick={() => {
               setFormState({
@@ -733,7 +733,7 @@ export const MembersManagementView: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '14px' }}>
+          <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
                 Residential / Business Address <span style={{ color: 'var(--danger)' }}>*</span>
@@ -791,7 +791,7 @@ export const MembersManagementView: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
                 Emergency Contact (Optional)
@@ -891,7 +891,7 @@ export const MembersManagementView: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '14px' }}>
+          <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
                 Address Line 1 <span style={{ color: 'var(--danger)' }}>*</span>
@@ -946,7 +946,7 @@ export const MembersManagementView: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <div className="stack-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px' }}>
                 Emergency Contact
@@ -1136,20 +1136,20 @@ export const MembersManagementView: React.FC = () => {
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Collections Paid</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>
-                  ₹{memberProfile.payment_receipts.reduce((sum, r) => sum + (r.amount || 0), 0).toLocaleString('en-IN')}
+                  ₹{memberProfile.payment_receipts.reduce((sum, r) => sum + Number(r.amount || 0), 0).toLocaleString('en-IN')}
                 </div>
               </div>
 
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending Net Dues</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger)', marginTop: '2px' }}>
-                  ₹{memberProfile.outstanding_dues.reduce((sum, d) => sum + (d.net_due || 0), 0).toLocaleString('en-IN')}
+                  ₹{memberProfile.outstanding_dues.reduce((sum, d) => sum + Number(d.net_due || 0), 0).toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
 
             {/* Profile Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', gap: '16px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid var(--border)', gap: '4px 16px' }}>
               <button
                 onClick={() => setProfileActiveTab('schemes')}
                 style={{

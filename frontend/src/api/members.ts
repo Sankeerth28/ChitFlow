@@ -16,6 +16,12 @@ function getApiBaseUrl(): string {
 
 const API_BASE_URL = getApiBaseUrl();
 
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 function getAuthHeaders(): HeadersInit {
   const token = authStorage.getToken();
   return {
@@ -92,12 +98,15 @@ export interface MemberReceiptItem {
 }
 
 export interface MemberDueItem {
+  instalment_id?: string;
   scheme_id: string;
+  scheme_code?: string;
   scheme_name: string;
   instalment_number: number;
   gross_subscription: number;
   dividend_amount: number;
   net_due: number;
+  amount_paid?: number;
   due_date?: string;
   status?: string;
 }
@@ -241,21 +250,32 @@ export async function fetchMemberProfile(memberId: string): Promise<MemberProfil
     throw new Error(err.detail || 'Failed to fetch member 360 profile.');
   }
   const profile: MemberProfile = await res.json();
-  // Normalize fields
+  // Normalize fields (the API exposes `recent_payments`, the portal calls them receipts)
   profile.enrolled_schemes = (profile.enrolled_schemes || []).map((s) => ({
     ...s,
     ticket_number: s.ticket_number ?? s.chit_ticket_number,
     is_prized: s.is_prized ?? s.has_prized,
-    total_dividend_earned: s.total_dividend_earned ?? s.total_dividend ?? 0,
-    balance_due: s.balance_due ?? s.outstanding_balance ?? 0,
+    chit_value: toNumber(s.chit_value),
+    monthly_subscription: toNumber(s.monthly_subscription),
+    total_paid: toNumber(s.total_paid),
+    total_dividend_earned: toNumber(s.total_dividend_earned ?? s.total_dividend),
+    balance_due: toNumber(s.balance_due ?? s.outstanding_balance),
   }));
-  profile.payment_receipts = (profile.payment_receipts || []).map((r) => ({
+  const rawReceipts = (profile as any).payment_receipts || (profile as any).recent_payments || [];
+  profile.payment_receipts = rawReceipts.map((r: any) => ({
     ...r,
     id: r.id || r.payment_id,
-    amount: r.amount || r.amount_received || 0,
+    amount: toNumber(r.amount ?? r.amount_received),
     payment_mode: r.payment_mode || r.payment_method || 'CASH',
     transaction_ref: r.transaction_ref || r.payment_reference_no || '',
     status: r.status || r.verification_status || 'verified',
+  }));
+  profile.outstanding_dues = (profile.outstanding_dues || []).map((d: any) => ({
+    ...d,
+    scheme_id: d.scheme_id || '',
+    gross_subscription: toNumber(d.gross_subscription),
+    dividend_amount: toNumber(d.dividend_amount ?? d.dividend_credit),
+    net_due: toNumber(d.net_due ?? d.balance_due ?? d.net_amount_due),
   }));
   return profile;
 }
@@ -275,8 +295,11 @@ export async function fetchMemberEnrolledChits(memberId: string): Promise<Enroll
     ...s,
     ticket_number: s.ticket_number ?? s.chit_ticket_number,
     is_prized: s.is_prized ?? s.has_prized,
-    total_dividend_earned: s.total_dividend_earned ?? s.total_dividend ?? 0,
-    balance_due: s.balance_due ?? s.outstanding_balance ?? 0,
+    chit_value: toNumber(s.chit_value),
+    monthly_subscription: toNumber(s.monthly_subscription),
+    total_paid: toNumber(s.total_paid),
+    total_dividend_earned: toNumber(s.total_dividend_earned ?? s.total_dividend),
+    balance_due: toNumber(s.balance_due ?? s.outstanding_balance),
   }));
 }
 
@@ -294,7 +317,7 @@ export async function fetchMemberReceipts(memberId: string): Promise<MemberRecei
   return list.map((r) => ({
     ...r,
     id: r.id || r.payment_id,
-    amount: r.amount || r.amount_received || 0,
+    amount: toNumber(r.amount ?? r.amount_received),
     payment_mode: r.payment_mode || r.payment_method || 'CASH',
     transaction_ref: r.transaction_ref || r.payment_reference_no || '',
     status: r.status || r.verification_status || 'verified',
@@ -311,7 +334,14 @@ export async function fetchMemberDues(memberId: string): Promise<MemberDueItem[]
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Failed to fetch instalment dues.');
   }
-  return res.json();
+  const list: any[] = await res.json();
+  return list.map((d) => ({
+    ...d,
+    scheme_id: d.scheme_id || '',
+    gross_subscription: toNumber(d.gross_subscription),
+    dividend_amount: toNumber(d.dividend_amount ?? d.dividend_credit),
+    net_due: toNumber(d.net_due ?? d.balance_due ?? d.net_amount_due),
+  }));
 }
 
 export async function fetchMember10SecDashboard(memberId: string): Promise<MemberDashboardSummary> {

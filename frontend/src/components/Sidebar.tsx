@@ -10,6 +10,7 @@ import {
   LogOut,
   ChevronRight,
   TrendingUp,
+  X,
 } from 'lucide-react';
 import type { UserProfile } from '../api/auth';
 
@@ -21,6 +22,8 @@ interface SidebarProps {
   onLogout?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 interface NavItem {
@@ -36,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
   onLogout,
+  isOpen = false,
+  onClose,
 }) => {
   const role = userRole || currentUser?.role || 'organiser';
 
@@ -80,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="flex flex-col"
+      className={`app-sidebar flex flex-col${isOpen ? ' is-open' : ''}`}
       style={{
         width: '260px',
         backgroundColor: 'var(--primary)',
@@ -97,7 +102,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         className="flex items-center gap-3"
         style={{
-          padding: '20px 20px 18px',
+          padding: '20px 16px 18px 20px',
+          justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
@@ -114,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Scale size={22} />
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div className="text-bold" style={{ fontSize: '16px', color: '#ffffff', letterSpacing: '-0.3px' }}>
             ChitFlow
           </div>
@@ -122,6 +128,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Statutory Engine
           </div>
         </div>
+        <button
+          type="button"
+          className="sidebar-close"
+          onClick={() => onClose?.()}
+          aria-label="Close navigation"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Role Pill */}
@@ -166,7 +180,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <li key={item.key}>
                 <button
-                  onClick={() => onSelectTab(item.key)}
+                  onClick={() => {
+                    onSelectTab(item.key);
+                    onClose?.();
+                  }}
                   className={`btn btn-interactive ${isActive ? 'text-bold' : ''}`}
                   style={{
                     width: '100%',

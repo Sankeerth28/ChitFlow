@@ -157,7 +157,7 @@ export const AuctionsView: React.FC = () => {
       </div>
 
       {/* Main Grid: Bidding Controls (Left) & Mathematical Breakdown (Right) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(360px, 100%), 1fr))', gap: '20px' }}>
         {/* Left Card: Reverse Auction Form */}
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 16px 0', color: 'var(--text)' }}>

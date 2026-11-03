@@ -17,6 +17,10 @@ Covers:
 import unittest
 import os
 import sys
+
+# Never let the test suite drop/recreate the development database.
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_chitflow.db")
+
 from decimal import Decimal
 from fastapi.testclient import TestClient
 

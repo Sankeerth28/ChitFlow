@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
 from decimal import Decimal
+from app.schemas.base import APIModel
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -13,13 +14,13 @@ class AuctionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class AuctionBidCreate(BaseModel):
+class AuctionBidCreate(APIModel):
     member_id: str
     bid_discount_amount: Decimal = Field(..., ge=0, example=Decimal('26000.00'))
     bid_source: str = Field(default="mobile", example="mobile")
 
 
-class AuctionBidResponse(BaseModel):
+class AuctionBidResponse(APIModel):
     id: str
     auction_id: str
     member_id: str
@@ -32,7 +33,7 @@ class AuctionBidResponse(BaseModel):
         from_attributes = True
 
 
-class AuctionConfirmRequest(BaseModel):
+class AuctionConfirmRequest(APIModel):
     winning_member_id: str
     winning_bid_discount: Decimal = Field(..., ge=0, example=Decimal('26000.00'))
     custom_commission: Optional[Decimal] = Field(None, ge=0, description="Optional custom commission (max 5%)")
@@ -42,7 +43,7 @@ class AuctionConfirmRequest(BaseModel):
     )
 
 
-class AuctionCalculationResponse(BaseModel):
+class AuctionCalculationResponse(APIModel):
     auction_id: str
     auction_number: int
     scheme_id: str
@@ -61,7 +62,7 @@ class AuctionCalculationResponse(BaseModel):
     payout_record_id: Optional[str] = None
 
 
-class AuctionResponse(BaseModel):
+class AuctionResponse(APIModel):
     id: str
     scheme_id: str
     auction_number: int

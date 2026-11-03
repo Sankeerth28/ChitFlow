@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Server,
+  Menu,
 } from 'lucide-react';
 import {
   loginUser,
@@ -45,6 +46,7 @@ const AppContent: React.FC = () => {
 
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
 
   // Check initial authentication and backend health
@@ -76,6 +78,32 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
+  // Mobile drawer: lock scroll, close on Escape or when the viewport grows
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    const handleResize = () => {
+      if (window.innerWidth > 900) setMobileNavOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleResize);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
+  // Navigate and collapse the mobile drawer in one step
+  const selectTab = (tab: string) => {
+    setActiveTab(tab);
+    setMobileNavOpen(false);
+  };
+
   // Login handler
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +129,7 @@ const AppContent: React.FC = () => {
       await logoutUser();
       setCurrentUser(null);
       setActiveTab('dashboard');
+      setMobileNavOpen(false);
       showToast('Logged out securely.', 'info');
     } catch {
       setCurrentUser(null);
@@ -369,19 +398,27 @@ const AppContent: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--background)' }}>
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation (drawer below 900px) */}
+      <div
+        className={`sidebar-backdrop${mobileNavOpen ? ' is-open' : ''}`}
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
+      />
       <Sidebar
         currentUser={currentUser}
         userRole={userRole}
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={selectTab}
         onLogout={handleLogout}
+        isOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
         {/* Top Navbar */}
         <header
+          className="app-header"
           style={{
             height: '64px',
             backgroundColor: 'var(--surface)',
@@ -396,18 +433,26 @@ const AppContent: React.FC = () => {
           }}
         >
           {/* Left Title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text)' }}>
+          <div className="app-title-group" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              className="nav-toggle"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Menu size={20} />
+            </button>
+            <span className="app-title" style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text)' }}>
               {currentUser.business_name || 'Sri Balaji Chit Funds Pvt. Ltd.'}
             </span>
-            <span className="badge badge-success" style={{ fontSize: '11px' }}>
+            <span className="badge badge-success hide-mobile" style={{ fontSize: '11px' }}>
               TS-REG-2026
             </span>
           </div>
 
           {/* Right User Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ textAlign: 'right' }}>
+            <div className="hide-mobile" style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>
                 {currentUser.full_name || currentUser.mobile_number}
               </div>
@@ -422,16 +467,17 @@ const AppContent: React.FC = () => {
               onClick={handleLogout}
               className="btn btn-secondary"
               title="Secure Sign Out"
+              aria-label="Sign Out"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', fontSize: '12px' }}
             >
               <LogOut size={14} />
-              Sign Out
+              <span className="hide-mobile">Sign Out</span>
             </button>
           </div>
         </header>
 
         {/* Dynamic Main Body Content */}
-        <main style={{ flex: 1, padding: '24px', maxWidth: '1440px', width: '100%', margin: '0 auto' }}>
+        <main className="app-main" style={{ flex: 1, padding: '24px', maxWidth: '1440px', width: '100%', margin: '0 auto' }}>
           {/* Organiser Views */}
           {userRole === 'organiser' && (
             <>
