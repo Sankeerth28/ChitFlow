@@ -3,7 +3,7 @@
  * Manages JWT tokens securely in sessionStorage (cleared upon tab close, avoiding permanent localStorage persistence).
  */
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.includes('chitflow-api.onrender.com')) {
     return envUrl.replace('chitflow-api.onrender.com', 'chitflow-api-weyi.onrender.com');
@@ -53,6 +53,19 @@ export const authStorage = {
   },
 };
 
+export async function checkApiHealth(): Promise<boolean> {
+  try {
+    const rootUrl = API_BASE_URL.replace('/api/v1', '');
+    const res = await fetch(`${rootUrl}/health`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function loginUser(mobileNumber: string, password?: string, pin?: string): Promise<AuthResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -76,8 +89,11 @@ export async function loginUser(mobileNumber: string, password?: string, pin?: s
     authStorage.setToken(data.access_token);
     return data;
   } catch (err: any) {
-    if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message.includes('fetch'))) {
-      throw new Error(`Unable to connect to ChitFlow API (${API_BASE_URL}). If backend is waking up, please wait a few seconds and try again.`);
+    const msg = String(err?.message || '');
+    if (msg.includes('fetch') || msg.includes('NetworkError') || err.name === 'TypeError') {
+      throw new Error(
+        `Unable to reach ChitFlow Cloud Backend (${API_BASE_URL}). If the server is in cold standby (Render free tier), please wait 15-20 seconds and click Sign In again.`
+      );
     }
     throw err;
   }
@@ -123,4 +139,3 @@ export async function logoutUser(): Promise<void> {
   }
   authStorage.clearToken();
 }
-

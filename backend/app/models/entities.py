@@ -67,13 +67,16 @@ class Member(Base):
     organiser_id = Column(String(36), ForeignKey("organisers.id"), nullable=False)
     member_code = Column(String(50), nullable=False)
     full_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
     address_line1 = Column(Text, nullable=False)
     city = Column(String(100), nullable=False)
     state = Column(String(50), default="Telangana", nullable=False)
     pincode = Column(String(10), nullable=False)
     emergency_contact = Column(String(20), nullable=True)
-    kyc_status = Column(String(50), default="pending")
+    kyc_status = Column(String(50), default="pending")  # verified, pending, rejected
+    status = Column(String(30), default="active", nullable=False)  # active, inactive, suspended
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint("organiser_id", "member_code", name="uq_organiser_member_code"),
